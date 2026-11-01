@@ -8,7 +8,9 @@ import { useManilaDate } from "../hr/Punch";
 export default function MyDtr() {
   const today = useManilaDate();
   const [month, setMonth] = useState(today.slice(0, 7));
-  const dtr = useQuery(api.self.monthly, month ? { month, today } : "skip");
+  // Only months the server accepts: an "Invalid month" thrown from useQuery would blank the app.
+  const valid = /^\d{4}-(0[1-9]|1[0-2])$/.test(month);
+  const dtr = useQuery(api.self.monthly, valid ? { month, today } : "skip");
 
   return (
     <>
@@ -18,7 +20,9 @@ export default function MyDtr() {
           <input type="month" value={month} onChange={(e) => setMonth(e.target.value)} />
         </label>
       </div>
-      {dtr === undefined ? (
+      {!valid ? (
+        <p role="status">Pick a month.</p>
+      ) : dtr === undefined ? (
         <p role="status">Loading…</p>
       ) : (
         <table>

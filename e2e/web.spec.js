@@ -117,6 +117,23 @@ test.describe("US-8 Employee views own DTR", () => {
     await expect(page.getByRole("button")).toHaveText(["Log out"]); // no create, edit or delete controls
   });
 
+  test("cleared month asks for a month instead of loading forever", async ({ page }) => {
+    const { employeeId } = await readyEmployee();
+    await login(page, employeeId, NEW);
+    await expect(page.getByRole("table")).toBeVisible();
+    await page.getByLabel("Month").fill("");
+    await expect(page.getByRole("status")).toHaveText("Pick a month.");
+  });
+
+  test("deactivated while signed in shows the not-allowed screen", async ({ page }) => {
+    const { employeeId, userId } = await readyEmployee();
+    await login(page, employeeId, NEW);
+    await expect(page.getByRole("table")).toBeVisible();
+    await admin.mutation(api.employees.setActive, { userId, active: false });
+    await expect(page.getByRole("alert")).toHaveText("This account can't use the employee app.");
+    await expect(page.getByRole("button", { name: "Log out" })).toBeVisible();
+  });
+
   test("employee session can't read another employee or call HR functions", async () => {
     const { employeeId, client } = await readyEmployee();
     const other = await newEmployee();

@@ -1,4 +1,10 @@
-import { getAuthUserId, modifyAccountCredentials, retrieveAccount } from "@convex-dev/auth/server";
+import {
+  getAuthSessionId,
+  getAuthUserId,
+  invalidateSessions,
+  modifyAccountCredentials,
+  retrieveAccount,
+} from "@convex-dev/auth/server";
 import { ConvexError, v } from "convex/values";
 import { internal } from "./_generated/api";
 import { action, internalMutation, query } from "./_generated/server";
@@ -44,11 +50,18 @@ export const changePassword = action({
     if (!isActiveEmployee(user)) throw new ConvexError("Not authorized");
     if (next.length < 8) throw new ConvexError("New password must be at least 8 characters");
     if (next === current) throw new ConvexError("New password must be different");
-    const account = { id: user.employeeId, secret: current };
-    const ok = await retrieveAccount(ctx, { provider: "password", account }).catch(() => null);
-    if (!ok) throw new ConvexError("Current password is incorrect");
+    // Shares sign-in's failed-attempt limit (10 per hour per account).
+    try {
+      await retrieveAccount(ctx, { provider: "password", account: { id: user.employeeId, secret: current } });
+    } catch (err) {
+      if (/TooManyFailedAttempts/.test(err.message)) throw new ConvexError("Too many attempts. Try again later.");
+      if (/InvalidSecret/.test(err.message)) throw new ConvexError("Current password is incorrect");
+      throw err;
+    }
     await modifyAccountCredentials(ctx, { provider: "password", account: { id: user.employeeId, secret: next } });
     await ctx.runMutation(internal.self.markPasswordChanged, { userId });
+    // Sessions opened with the old password end; this one stays signed in.
+    await invalidateSessions(ctx, { userId, except: [await getAuthSessionId(ctx)] });
     return null;
   },
 });

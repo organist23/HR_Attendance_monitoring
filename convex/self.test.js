@@ -21,7 +21,8 @@ async function setup() {
     employeeId: "E001", name: "Juan Dela Cruz", password: "temp-pass-1",
   });
   at(NOW);
-  const emp = t.withIdentity({ subject: `${userId}|session` });
+  const sessionId = await t.run((ctx) => ctx.db.insert("authSessions", { userId, expirationTime: 9e15 }));
+  const emp = t.withIdentity({ subject: `${userId}|${sessionId}` });
   const change = (current, next) => emp.action(api.self.changePassword, { current, next });
   const deactivate = () => admin.mutation(api.employees.setActive, { userId, active: false });
   return { t, admin, emp, userId, change, deactivate };
@@ -95,6 +96,27 @@ test("changePassword: wrong current, short or same new rejected, flag unchanged"
   await expect(change("temp-pass-1", "temp-pass-1")).rejects.toThrow("New password must be different");
   expect((await emp.query(api.self.me, {})).mustChangePassword).toBe(true);
   await change("temp-pass-1", "new-pass-22"); // temp password still valid after the rejections
+});
+
+test("changePassword: signs out other sessions, keeps this one", async () => {
+  const { t, userId } = await setup();
+  const [here, elsewhere] = await t.run(async (ctx) => [
+    await ctx.db.insert("authSessions", { userId, expirationTime: 9e15 }),
+    await ctx.db.insert("authSessions", { userId, expirationTime: 9e15 }), // signed in with the temp password
+  ]);
+  const emp = t.withIdentity({ subject: `${userId}|${here}` });
+  await emp.action(api.self.changePassword, { current: "temp-pass-1", next: "new-pass-22" });
+  const left = await t.run((ctx) => ctx.db.query("authSessions").collect());
+  expect(left.map((s) => s._id)).toEqual([here]); // setup's own session is "elsewhere" too
+  expect(elsewhere).not.toBe(here);
+});
+
+test("changePassword: too many wrong attempts says so", async () => {
+  const { change } = await setup();
+  for (let i = 0; i < 10; i++) {
+    await expect(change("wrong-pass-0", "new-pass-22")).rejects.toThrow("Current password is incorrect");
+  }
+  await expect(change("temp-pass-1", "new-pass-22")).rejects.toThrow("Too many attempts. Try again later.");
 });
 
 test("changePassword: admin and inactive rejected", async () => {
