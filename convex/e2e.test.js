@@ -63,3 +63,31 @@ test("purge deletes only E2E- employees and everything tied to them", async () =
   const holidays = await t.run((ctx) => ctx.db.query("holidays").collect());
   expect(holidays.map((h) => h.name)).toEqual(["Christmas"]);
 });
+
+const seedArgs = (employeeId) => ({ employeeId, date: "2026-10-30", timeIn: 111 });
+
+test("seedPunch refuses when E2E_PURGE_ALLOWED is not set", async () => {
+  const { t } = await seed();
+  await expect(t.mutation(internal.e2e.seedPunch, seedArgs("E2E-1"))).rejects.toThrow(
+    "E2E purge disabled on this deployment",
+  );
+  expect(await count(t, "attendance")).toBe(2);
+});
+
+test("seedPunch refuses non-E2E employees", async () => {
+  process.env.E2E_PURGE_ALLOWED = "true";
+  const { t } = await seed();
+  await expect(t.mutation(internal.e2e.seedPunch, seedArgs("E001"))).rejects.toThrow("Employee must start with E2E-");
+  await expect(t.mutation(internal.e2e.seedPunch, seedArgs("E2E-404"))).rejects.toThrow("Employee not found");
+  expect(await count(t, "attendance")).toBe(2);
+});
+
+test("seedPunch inserts a row for an E2E employee", async () => {
+  process.env.E2E_PURGE_ALLOWED = "true";
+  const { t, testId } = await seed();
+  await t.mutation(internal.e2e.seedPunch, { ...seedArgs("E2E-1"), timeOut: 222 });
+  const rows = await t.run((ctx) => ctx.db.query("attendance").withIndex("by_date", (q) => q.eq("date", "2026-10-30")).collect());
+  expect(rows.map(({ userId, timeIn, timeOut }) => ({ userId, timeIn, timeOut }))).toEqual([
+    { userId: testId, timeIn: 111, timeOut: 222 },
+  ]);
+});

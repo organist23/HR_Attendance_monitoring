@@ -44,7 +44,8 @@ npx convex env set --deployment "${TEST_DEPLOYMENT:?}" E2E_PURGE_ALLOWED true
 # 3. Throwaway admin, random password, written to .env.e2e (git-ignored)
 PASS=$(node -e "console.log(require('crypto').randomBytes(12).toString('base64url'))")
 npx convex run --deployment "${TEST_DEPLOYMENT:?}" admin:create "{\"username\":\"e2e-admin\",\"password\":\"$PASS\"}"
-printf 'E2E_ADMIN_USER=e2e-admin\nE2E_ADMIN_PASS=%s\n' "$PASS" > .env.e2e
+# E2E_DEPLOYMENT lets the spec seed past punches with e2e:seedPunch (same gate as purge).
+printf 'E2E_ADMIN_USER=e2e-admin\nE2E_ADMIN_PASS=%s\nE2E_DEPLOYMENT=%s\n' "$PASS" "${TEST_DEPLOYMENT:?}" > .env.e2e
 
 # 4. Build the renderer against the test deployment
 npm run build
