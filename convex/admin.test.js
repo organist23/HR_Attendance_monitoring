@@ -46,3 +46,10 @@ test("sign-up flow rejected", async () => {
   ).rejects.toThrow("Sign-up disabled");
   expect(await t.run((ctx) => ctx.db.query("users").collect())).toEqual([]);
 });
+
+test("isAdmin is true for admin, false for employee and anonymous", async () => {
+  const t = convexTest(schema, modules);
+  expect(await t.query(api.admin.isAdmin, {})).toBe(false);
+  expect(await (await asRole(t, "employee")).as.query(api.admin.isAdmin, {})).toBe(false);
+  expect(await (await asRole(t, "admin")).as.query(api.admin.isAdmin, {})).toBe(true);
+});

@@ -1,5 +1,6 @@
 import { useAuthActions } from "@convex-dev/auth/react";
-import { useConvexAuth } from "convex/react";
+import { useConvexAuth, useQuery } from "convex/react";
+import { api } from "../convex/_generated/api";
 import { useRef, useState } from "react";
 import Employees from "./Employees";
 import Login from "./Login";
@@ -13,8 +14,23 @@ export default function App() {
   const [tab, setTab] = useState("Punch");
   const tabRefs = useRef({});
 
-  if (isLoading) return <p className="center" role="status">Loading…</p>;
+  const isAdmin = useQuery(api.admin.isAdmin, isAuthenticated ? {} : "skip");
+
+  if (isLoading || (isAuthenticated && isAdmin === undefined)) {
+    return <p className="center" role="status">Loading…</p>;
+  }
   if (!isAuthenticated) return <Login />;
+  // Employees also have accounts; without this they'd hit "Not authorized" on every HR query.
+  if (!isAdmin) {
+    return (
+      <main className="login">
+        <div className="card">
+          <p role="alert" className="error">This account is not an HR admin.</p>
+          <button onClick={() => void signOut()}>Log out</button>
+        </div>
+      </main>
+    );
+  }
 
   // Left/Right arrows move between tabs (WAI-ARIA tabs pattern).
   function onTabKey(e) {

@@ -21,7 +21,7 @@ async function setup(employee = {}) {
     }),
   );
   const punch = (employeeId = "E001") => as.mutation(api.attendance.punch, { employeeId });
-  const today = () => as.query(api.attendance.today, {});
+  const today = (date = "2026-11-02") => as.query(api.attendance.today, { date });
   const rows = () => t.run((ctx) => ctx.db.query("attendance").collect());
   return { t, punch, today, rows };
 }
@@ -94,12 +94,11 @@ test("Monday 07:30 Manila (Sunday UTC) is dated Monday", async () => {
   expect((await rows())[0].date).toBe("2026-11-02");
 });
 
-test("today excludes other days", async () => {
+test("today returns only the requested date", async () => {
   const { punch, today } = await setup();
   at(MON_0805);
   await punch();
-  at("2026-11-03T00:05:00Z");
-  expect(await today()).toEqual([]);
+  expect(await today("2026-11-03")).toEqual([]);
 });
 
 test("non-admin rejected by punch and today", async () => {
@@ -107,5 +106,5 @@ test("non-admin rejected by punch and today", async () => {
   const { as } = await asRole(t, "employee", { employeeId: "E002", active: true });
   at(MON_0805);
   await expect(as.mutation(api.attendance.punch, { employeeId: "E002" })).rejects.toThrow("Not authorized");
-  await expect(as.query(api.attendance.today, {})).rejects.toThrow("Not authorized");
+  await expect(as.query(api.attendance.today, { date: "2026-11-02" })).rejects.toThrow("Not authorized");
 });

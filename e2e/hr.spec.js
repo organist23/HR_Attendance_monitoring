@@ -39,6 +39,8 @@ async function createEmployee(employeeId, name = "E2E Tester", password = "temp-
   await page.getByLabel("Full name").fill(name);
   await page.getByLabel("Temporary password").fill(password);
   await page.getByRole("button", { name: "Create employee" }).click();
+  // Earlier runs leave E2E rows behind, so a new one may sort past page 1: search for it.
+  await page.getByLabel("Search employees").fill(employeeId);
 }
 
 const newId = () => `E2E-${Date.now()}`;
@@ -61,6 +63,18 @@ test.describe("US-1 HR login", () => {
   test("correct login shows Punch tab", async () => {
     await login();
     await expect(page.getByRole("tab", { name: "Punch" })).toBeVisible();
+  });
+
+  test("employee account sees Not authorized and can log out", async () => {
+    await login();
+    const id = newId();
+    await createEmployee(id, "E2E Employee", "emp-pass-123");
+    await expect(rowFor(id)).toBeVisible();
+    await page.getByRole("button", { name: "Log out" }).click();
+    await login(id, "emp-pass-123");
+    await expect(page.getByRole("alert")).toHaveText("This account is not an HR admin.");
+    await page.getByRole("button", { name: "Log out" }).click();
+    await expect(page.getByRole("button", { name: "Sign in" })).toBeVisible();
   });
 
   test("logout returns to login", async () => {

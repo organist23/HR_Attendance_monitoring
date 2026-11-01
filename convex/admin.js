@@ -1,7 +1,7 @@
-import { createAccount } from "@convex-dev/auth/server";
+import { createAccount, getAuthUserId } from "@convex-dev/auth/server";
 import { ConvexError, v } from "convex/values";
 import { internal } from "./_generated/api";
-import { internalAction, internalQuery } from "./_generated/server";
+import { internalAction, internalQuery, query } from "./_generated/server";
 
 export const getUser = internalQuery({
   args: { userId: v.id("users") },
@@ -28,5 +28,14 @@ export const create = internalAction({
       profile: { name: "HR Admin", role: "admin" },
     });
     return user._id;
+  },
+});
+
+// Lets the HR app tell a signed-in employee apart from the admin.
+export const isAdmin = query({
+  args: {},
+  handler: async (ctx) => {
+    const userId = await getAuthUserId(ctx);
+    return userId !== null && (await ctx.db.get(userId))?.role === "admin";
   },
 });

@@ -34,11 +34,11 @@ export const punch = mutation({
   },
 });
 
+// The client passes its Manila date: a query reading Date.now() would not re-run at midnight.
 export const today = query({
-  args: {},
-  handler: async (ctx) => {
+  args: { date: v.string() },
+  handler: async (ctx, { date }) => {
     await requireAdmin(ctx);
-    const { date } = manilaDay(Date.now());
     const rows = await ctx.db
       .query("attendance")
       .withIndex("by_date", (q) => q.eq("date", date))

@@ -24,15 +24,25 @@ export const create = action({
     if (!employeeId || !name || !password.trim()) {
       throw new ConvexError("Employee ID, name, and password are required");
     }
-    // shortcut: concurrent create of the same ID gets createAccount's raw error, not the friendly one; fine with one HR user
     if (await ctx.runQuery(internal.employees.byEmployeeId, { employeeId })) {
       throw new ConvexError("Employee ID already exists");
     }
-    const { user } = await createAccount(ctx, {
-      provider: "password",
-      account: { id: employeeId, secret: password },
-      profile: { name, role: "employee", employeeId, active: true, searchText: `${employeeId} ${name}` },
-    });
+    // Employee IDs share the account namespace with the admin username. createAccount throws on a
+    // clash with a different password and returns the existing account on a matching one.
+    let user;
+    try {
+      ({ user } = await createAccount(ctx, {
+        provider: "password",
+        account: { id: employeeId, secret: password },
+        profile: { name, role: "employee", employeeId, active: true, searchText: `${employeeId} ${name}` },
+      }));
+    } catch (err) {
+      if (/already exists/.test(err.message)) throw new ConvexError("Employee ID already exists");
+      throw err;
+    }
+    if (user.role !== "employee" || user.employeeId !== employeeId) {
+      throw new ConvexError("Employee ID already exists");
+    }
     return user._id;
   },
 });

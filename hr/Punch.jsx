@@ -1,7 +1,18 @@
 import { useMutation, useQuery } from "convex/react";
 import { useEffect, useRef, useState } from "react";
 import { api } from "../convex/_generated/api";
+import { manilaDay } from "../convex/lib/manila";
 import { errorText } from "./errors";
+
+// Re-checks every minute so the Today list rolls over at Manila midnight.
+function useManilaDate() {
+  const [date, setDate] = useState(() => manilaDay(Date.now()).date);
+  useEffect(() => {
+    const id = setInterval(() => setDate(manilaDay(Date.now()).date), 60_000);
+    return () => clearInterval(id);
+  }, []);
+  return date;
+}
 
 const manilaTime = (ms) =>
   new Date(ms).toLocaleTimeString("en-PH", {
@@ -13,7 +24,8 @@ const manilaTime = (ms) =>
 
 export default function Punch() {
   const punch = useMutation(api.attendance.punch);
-  const today = useQuery(api.attendance.today);
+  const date = useManilaDate();
+  const today = useQuery(api.attendance.today, { date });
   const [employeeId, setEmployeeId] = useState("");
   const [pending, setPending] = useState(false);
   const [result, setResult] = useState("");

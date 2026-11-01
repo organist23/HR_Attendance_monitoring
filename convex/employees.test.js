@@ -1,6 +1,6 @@
 import { convexTest } from "convex-test";
 import { expect, test } from "vitest";
-import { api } from "./_generated/api";
+import { api, internal } from "./_generated/api";
 import schema from "./schema";
 import { asRole, modules, page1 } from "../test/convexHelpers";
 
@@ -104,4 +104,16 @@ test("non-admin is rejected by create, list, setActive", async () => {
   await expect(as.mutation(api.employees.setActive, { userId, active: false })).rejects.toThrow(
     "Not authorized",
   );
+});
+
+test("employee ID equal to the admin username is rejected (same or different password)", async () => {
+  const t = convexTest(schema, modules);
+  await t.action(internal.admin.create, { username: "boss", password: "admin-pass" });
+  const { as } = await asRole(t, "admin");
+  for (const password of ["admin-pass", "other-pass"]) {
+    await expect(
+      as.action(api.employees.create, { employeeId: "boss", name: "Fake", password }),
+    ).rejects.toThrow("Employee ID already exists");
+  }
+  expect(await employeeRows(t)).toHaveLength(0);
 });
