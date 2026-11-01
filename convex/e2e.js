@@ -24,7 +24,7 @@ export const purge = internalMutation({
     if (process.env.E2E_PURGE_ALLOWED !== "true") throw new Error("E2E purge disabled on this deployment");
     if (!prefix.startsWith("E2E-")) throw new Error("Prefix must start with E2E-");
 
-    const counts = { users: 0, attendance: 0, accounts: 0, sessions: 0, refreshTokens: 0, holidays: 0 };
+    const counts = { users: 0, attendance: 0, accounts: 0, rateLimits: 0, sessions: 0, refreshTokens: 0, holidays: 0 };
     const users = await ctx.db
       .query("users")
       .withIndex("by_employeeId", (q) => q.gte("employeeId", prefix).lt("employeeId", `${prefix}￿`))
@@ -41,7 +41,18 @@ export const purge = internalMutation({
           .withIndex(index, (q) => q.eq("userId", user._id))
           .collect();
       await del(await byUser("attendance", "by_user_date"), "attendance");
-      await del(await byUser("authAccounts", "userIdAndProvider"), "accounts");
+      const accounts = await byUser("authAccounts", "userIdAndProvider");
+      for (const account of accounts) {
+        // Failed sign-ins and password checks leave these, keyed by account id.
+        await del(
+          await ctx.db
+            .query("authRateLimits")
+            .withIndex("identifier", (q) => q.eq("identifier", account._id))
+            .collect(),
+          "rateLimits",
+        );
+      }
+      await del(accounts, "accounts");
       const sessions = await byUser("authSessions", "userId");
       for (const session of sessions) {
         await del(

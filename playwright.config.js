@@ -5,4 +5,14 @@ try {
   process.loadEnvFile(".env.e2e");
 } catch {}
 
-export default defineConfig({ testDir: "e2e", workers: 1, timeout: 60_000 });
+export default defineConfig({
+  testDir: "e2e",
+  workers: 1,
+  timeout: 60_000,
+  projects: [
+    { name: "hr", testMatch: "hr.spec.js" }, // Electron, launched by the spec
+    { name: "web", testMatch: "web.spec.js", use: { channel: "chrome", baseURL: "http://localhost:4174" } },
+  ],
+  // Serves the built employee web app (dist/web) for the web project.
+  webServer: { command: "npx vite preview --config vite.web.config.js --port 4174 --strictPort", url: "http://localhost:4174" },
+});

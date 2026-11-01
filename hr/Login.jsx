@@ -1,7 +1,9 @@
 import { useAuthActions } from "@convex-dev/auth/react";
+import { ConvexError } from "convex/values";
 import { useState } from "react";
 
-export default function Login() {
+// Shared by the HR app and the employee web app (web/).
+export default function Login({ title = "HR Attendance", userLabel = "Username" }) {
   const { signIn } = useAuthActions();
   const [pending, setPending] = useState(false);
   const [error, setError] = useState("");
@@ -17,8 +19,10 @@ export default function Login() {
         password: form.get("password"),
         flow: "signIn",
       });
-    } catch {
-      setError("Invalid username or password");
+    } catch (err) {
+      // Server rules (e.g. "Account inactive") come as ConvexError; a wrong password does not.
+      const what = userLabel[0].toLowerCase() + userLabel.slice(1); // "username", "employee ID"
+      setError(err instanceof ConvexError ? err.data : `Invalid ${what} or password`);
       setPending(false);
     }
   }
@@ -26,9 +30,9 @@ export default function Login() {
   return (
     <main className="login">
       <form onSubmit={submit} className="card">
-        <h1>HR Attendance</h1>
+        <h1>{title}</h1>
         <label>
-          Username
+          {userLabel}
           <input name="username" autoComplete="username" autoFocus required disabled={pending} />
         </label>
         <label>

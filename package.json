@@ -5,9 +5,10 @@
   "scripts": {
     "test": "vitest run",
     "dev": "vite",
-    "build": "vite build",
+    "build": "vite build && vite build --config vite.web.config.js",
     "hr": "electron .",
-    "e2e": "playwright test"
+    "e2e": "playwright test",
+    "web": "vite --config vite.web.config.js"
   },
   "dependencies": {
     "@auth/core": "^0.41.3",
