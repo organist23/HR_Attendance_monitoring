@@ -55,4 +55,4 @@ Phase 0 E2E tests: all still pass, and the 3 workday-only tests were SKIPPED (we
 
 - Purge counts on the final run: `{"users":13,"accounts":13,"attendance":0,"holidays":3,"sessions":0,"refreshTokens":0}`. Earlier runs were purged too. Afterwards the deployment held only the admin, and the holidays and attendance tables were empty.
 - `.env.local` restored to `woozy-nightingale-996`, `.env.e2e` deleted, `dist/hr` rebuilt and confirmed to point at dev.
-- **Left behind:** the Convex projects `hr-e2e-phase1` and `hr-e2e-phase1b`. The developer deletes them from the dashboard.
+- **Left behind:** nothing. The developer deleted the Convex projects `hr-e2e-phase1` and `hr-e2e-phase1b` from the dashboard on 2026-11-01.
