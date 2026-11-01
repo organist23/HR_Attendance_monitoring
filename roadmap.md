@@ -88,13 +88,35 @@ Conventions later phases inherit:
 
 Deliberately not built, and why: removing a punch (US-6 asks only to edit or add), recording which admin made a change (there is one shared admin account).
 
-### Phase 3 — Employee web app NEXT
+### Phase 3 — Employee web app ✅ DONE (merged `7b33524`, 2026-11-01)
 
 Covers US-7, US-8.
 
 - Employees log in by ID and password and view their own monthly DTR, read-only
 
-### Phase 4 — Reports LATER
+**Verified** on 2026-11-01. Backend `npm test` 96/96. Playwright over Electron and in system Chrome, against `vite preview` of `dist/web`, ran in a throwaway Convex project under the `e2e-testing` skill: 32 pass and 4 skipped. The 4 skipped tests are the Phase 0/1 weekday-only punch tests and still need a weekday run. Results: `PHASE-3-TEST-RESULTS.md`.
+
+Shipped as:
+- `convex/self.js`: `me`, `monthly({ month, today })`, `changePassword({ current, next })`. All act on the signed-in employee only.
+- `convex/auth.js`: sign-in rejects inactive employees (`Account inactive`) and reports lockout (`Too many attempts. Try again later.`).
+- `convex/attendance.js`: `monthFor(ctx, user, month, today)`, shared by `attendance.monthly` and `self.monthly`.
+- `convex/lib/manila.js`: adds `isMonth`.
+- Schema: users add `passwordChangedAt`. While it is unset, the employee must change the password.
+- `convex/e2e.js`: `purge` also deletes `authRateLimits`.
+- `web/` (built by `vite.web.config.js` to `dist/web`, run with `npm run web`): Login, Change password, My DTR.
+- `hr/Login.jsx` takes `title` and `userLabel` and shows server error text. `hr/DTR.jsx` exports `DayHeaders`, `DayCells`, `TotalCells`.
+
+Decisions made with the user: employees see only the US-8 columns. Correction details stay HR-only.
+
+Conventions later phases inherit:
+- Employee-facing functions live in `convex/self.js`, take no employee ID, and re-check active employee status on every call.
+- Every month, HR or employee, comes from `monthFor`. Month strings are checked with `isMonth`.
+- A password change signs out the employee's other sessions.
+- `npm run build` builds both apps. E2E has two Playwright projects, `hr` (Electron) and `web` (Chrome, `vite preview` on port 4174). Web setup uses a `ConvexHttpClient` signed in as `e2e-admin`, and `e2e/seed.js` seeds past punches.
+
+Deliberately not built, and why: hosting the web build (not in the spec, only `vite preview` locally), employee self-service password reset (not in the spec), signing out a deactivated employee's sessions (they reach no data).
+
+### Phase 4 — Reports NEXT
 
 Covers US-9, US-10.
 
