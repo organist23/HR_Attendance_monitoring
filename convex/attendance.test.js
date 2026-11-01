@@ -413,3 +413,87 @@ test("correct: inactive employee can be corrected", async () => {
   await correct({ date: "2026-11-03", timeOut: "17:00" });
   expect((await rows())[0].timeOut).toBe(manila("2026-11-03", "17:00"));
 });
+
+// US-9: a month with nothing counted yet is empty, not an error or made-up rows.
+test("monthly: future month and month before hire are empty", async () => {
+  const { monthly } = await monthSetup();
+  for (const month of ["2026-12", "2026-10"]) {
+    const dtr = await monthly({ month });
+    expect(dtr.days).toHaveLength(31);
+    expect(dtr.days.every((d) => d.status === "")).toBe(true);
+    expect(dtr.totals).toEqual({ rendered: 0, required: 0, missing: 0, late: 0, undertime: 0, absences: 0 });
+  }
+});
+
+// US-10. Same employee and month as "monthly: daily rows and totals".
+const HEADER = "Employee ID,Name,Rendered (min),Required (min),Missing (min),Late (min),Undertime (min),Absences\r\n";
+
+async function csvSetup() {
+  const s = await monthSetup();
+  const employee = (employeeId, fields = {}) =>
+    s.t.run((ctx) => ctx.db.insert("users", { role: "employee", employeeId, name: `Name ${employeeId}`, active: true, ...fields }));
+  const punchedBy = (userId, date, inAt, outAt) =>
+    s.t.run((ctx) => ctx.db.insert("attendance", { userId, date, timeIn: manila(date, inAt), timeOut: manila(date, outAt) }));
+  const csv = (args = {}) => s.as.query(api.attendance.monthlyCsv, { month: "2026-11", today: "2026-11-06", ...args });
+  return { ...s, employee, punchedBy, csv };
+}
+
+test("monthlyCsv: one row per employee with monthly totals", async () => {
+  const { punched, csv } = await csvSetup();
+  await punched("2026-11-02", "08:20", "17:00");
+  await punched("2026-11-03", "08:00", "16:00");
+  expect(await csv()).toEqual({ count: 1, csv: HEADER + "E001,Juan Dela Cruz,880,1920,1040,20,60,2\r\n" });
+});
+
+test("monthlyCsv: inactive employees only with records in the month", async () => {
+  const { employee, punchedBy, csv } = await csvSetup();
+  const e2 = await employee("E002", { active: false });
+  await punchedBy(e2, "2026-11-02", "08:00", "17:00");
+  await employee("E003", { active: false });
+  const e4 = await employee("E004", { active: false });
+  await punchedBy(e4, "2026-10-30", "08:00", "17:00");
+  const { count, csv: text } = await csv();
+  expect(count).toBe(2);
+  expect(text.split("\r\n").slice(1, 3)).toEqual(["E001,Juan Dela Cruz,0,1920,1920,0,0,4", "E002,Name E002,480,480,0,0,0,0"]);
+});
+
+test("monthlyCsv: sorted by ID, admin excluded", async () => {
+  const { employee, csv } = await csvSetup();
+  await employee("E010");
+  await employee("E002");
+  const ids = (await csv()).csv.split("\r\n").slice(1, -1).map((line) => line.split(",")[0]);
+  expect(ids).toEqual(["E001", "E002", "E010"]);
+});
+
+test("monthlyCsv: quotes and formula guard", async () => {
+  const { employee, csv } = await csvSetup();
+  await employee("E002", { name: 'Dela Cruz, Juan "JJ"' });
+  await employee("E003", { name: '=HYPERLINK("x")' });
+  await employee("E004", { name: "Line\nBreak" });
+  await employee("E005", { name: "Ñoño" });
+  await employee("-E006", { name: "+1" });
+  const text = (await csv()).csv;
+  expect(text).toContain('\r\nE002,"Dela Cruz, Juan ""JJ""",');
+  expect(text).toContain(`\r\nE003,"'=HYPERLINK(""x"")",`);
+  expect(text).toContain('\r\nE004,"Line\nBreak",');
+  expect(text).toContain("\r\nE005,Ñoño,");
+  expect(text).toContain("\r\n'-E006,'+1,");
+});
+
+test("monthlyCsv: no employees gives header only", async () => {
+  const t = convexTest(schema, modules);
+  const { as } = await asRole(t, "admin", { email: "admin" });
+  expect(await as.query(api.attendance.monthlyCsv, { month: "2026-11", today: "2026-11-06" })).toEqual({ count: 0, csv: HEADER });
+});
+
+test("monthlyCsv: invalid month rejected with no employees", async () => {
+  const t = convexTest(schema, modules);
+  const { as } = await asRole(t, "admin", { email: "admin" });
+  await expect(as.query(api.attendance.monthlyCsv, { month: "2026-13", today: "2026-11-06" })).rejects.toThrow("Invalid month");
+});
+
+test("monthlyCsv: non-admin rejected", async () => {
+  const t = convexTest(schema, modules);
+  const { as } = await asRole(t, "employee", { employeeId: "E002", active: true });
+  await expect(as.query(api.attendance.monthlyCsv, { month: "2026-11", today: "2026-11-06" })).rejects.toThrow("Not authorized");
+});
