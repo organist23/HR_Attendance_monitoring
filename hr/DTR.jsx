@@ -1,4 +1,4 @@
-import { useMutation, useQuery } from "convex/react";
+import { useConvex, useMutation, useQuery } from "convex/react";
 import { Fragment, useEffect, useRef, useState } from "react";
 import { api } from "../convex/_generated/api";
 import { manilaDay, manilaMinutes } from "../convex/lib/manila";
@@ -97,7 +97,7 @@ function Correction({ employeeId, day, onClose }) {
   }
 
   return (
-    <tr>
+    <tr className="no-print">
       <td colSpan={10}>
         {day.corrections.length > 0 && (
           <ul>
@@ -147,6 +147,31 @@ export default function DTR() {
   const [editing, setEditing] = useState(null);
   const editButtons = useRef(new Map());
   const dtr = useQuery(api.attendance.monthly, shown ? { ...shown, today } : "skip");
+  const convex = useConvex();
+  const [exporting, setExporting] = useState(false);
+  const [exported, setExported] = useState({ status: "", error: "" });
+
+  // US-10. A one-off read, not a live subscription to every employee's month.
+  async function exportCsv() {
+    if (exporting) return;
+    setExporting(true);
+    setExported({ status: "", error: "" });
+    try {
+      const { count, csv } = await convex.query(api.attendance.monthlyCsv, { month, today });
+      // The BOM makes Excel read the file as UTF-8 (names like Ñoño).
+      const url = URL.createObjectURL(new Blob(["\ufeff", csv], { type: "text/csv" }));
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `attendance-${month}.csv`;
+      link.click();
+      URL.revokeObjectURL(url);
+      setExported({ status: `Exported ${count} employees`, error: "" });
+    } catch (err) {
+      setExported({ status: "", error: errorText(err) });
+    } finally {
+      setExporting(false);
+    }
+  }
 
   function submit(e) {
     e.preventDefault();
@@ -162,7 +187,7 @@ export default function DTR() {
 
   return (
     <>
-      <form onSubmit={submit} className="row">
+      <form onSubmit={submit} className="row no-print">
         <label>
           Employee ID
           <input value={employeeId} onChange={(e) => setEmployeeId(e.target.value)} />
@@ -172,7 +197,20 @@ export default function DTR() {
           <input type="month" value={month} onChange={(e) => setMonth(e.target.value)} />
         </label>
         <button type="submit">View</button>
+        <button type="button" className="secondary" disabled={!month || exporting} onClick={exportCsv}>
+          {exporting ? "Exporting…" : "Export CSV"}
+        </button>
       </form>
+      {exported.status && (
+        <p role="status" className="no-print">
+          {exported.status}
+        </p>
+      )}
+      {exported.error && (
+        <p role="alert" className="error no-print">
+          {exported.error}
+        </p>
+      )}
 
       {shown && dtr === undefined && <p role="status">Loading…</p>}
       {dtr === null && (
@@ -182,14 +220,19 @@ export default function DTR() {
       )}
       {dtr && (
         <>
-          <h2>
-            {dtr.employeeId} {dtr.name} · {shown.month}
-          </h2>
+          <div className="row">
+            <h2>
+              {dtr.employeeId} {dtr.name} · {shown.month}
+            </h2>
+            <button className="secondary no-print" onClick={() => window.print()}>
+              Print
+            </button>
+          </div>
           <table>
             <thead>
               <tr>
                 <DayHeaders />
-                <th>
+                <th className="no-print">
                   <span className="sr-only">Actions</span>
                 </th>
               </tr>
@@ -199,7 +242,7 @@ export default function DTR() {
                 <Fragment key={d.date}>
                   <tr>
                     <DayCells d={d} />
-                    <td>
+                    <td className="no-print">
                       {(d.timeIn !== undefined || d.status === "Absent") && (
                         <button
                           ref={(el) => (el ? editButtons.current.set(d.date, el) : editButtons.current.delete(d.date))}

@@ -1,4 +1,7 @@
 import { _electron as electron, expect, test } from "@playwright/test";
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
 import { SEED_DATE, seedPunchOn } from "./seed.js";
 import { isWorkday as isWorkdayRule, manilaDay } from "../convex/lib/manila.js";
 
@@ -364,5 +367,117 @@ test.describe("US-6 Corrections", () => {
     await page.getByLabel("Reason").press("Escape");
     await expect(page.getByRole("button", { name: "Save" })).toHaveCount(0);
     await expect(day().getByRole("button", { name: "Edit" })).toBeFocused();
+  });
+});
+
+// US-9. The native print dialog is outside the app: window.print is recorded, and the print
+// view is checked with print media plus a real printToPDF of the window.
+test.describe("US-9 Print DTR", () => {
+  test.beforeEach(() => login());
+
+  test("Print opens the print dialog and print view shows only the DTR", async () => {
+    const id = newId();
+    await createEmployee(id);
+    await expect(rowFor(id)).toBeVisible();
+    seedPunch(id, "08:00", "17:00");
+    await viewDtr(id, SEED_DATE.slice(0, 7));
+    const day = page.getByRole("row").filter({ hasText: SEED_DATE });
+    await expect(day).toContainText("Present");
+    await day.getByRole("button", { name: "Edit" }).click(); // an open correction form must not print
+
+    await page.evaluate(() => {
+      window.printCalls = 0;
+      window.print = () => window.printCalls++;
+    });
+    await page.getByRole("button", { name: "Print" }).click();
+    expect(await page.evaluate(() => window.printCalls)).toBe(1);
+
+    await page.emulateMedia({ media: "print" });
+    for (const hidden of [
+      page.getByRole("tablist"),
+      page.getByRole("button", { name: "Log out" }),
+      page.getByLabel("Employee ID"),
+      page.getByRole("button", { name: "Print" }),
+      page.getByRole("button", { name: "Export CSV" }),
+      page.getByRole("button", { name: "Edit" }).first(),
+      page.getByLabel("Reason"),
+    ]) {
+      await expect(hidden).toBeHidden();
+    }
+    await expect(page.getByRole("heading", { level: 2 })).toHaveText(`${id} E2E Tester · ${SEED_DATE.slice(0, 7)}`);
+    await expect(day).toBeVisible();
+    await expect(page.getByRole("row").filter({ hasText: "Totals" })).toBeVisible();
+    const pdfBytes = await app.evaluate(
+      async ({ BrowserWindow }) => (await BrowserWindow.getAllWindows()[0].webContents.printToPDF({})).length,
+    );
+    expect(pdfBytes).toBeGreaterThan(1000);
+  });
+
+  test("employee hired after the month shows an empty DTR", async () => {
+    const id = newId();
+    await createEmployee(id);
+    await expect(rowFor(id)).toBeVisible();
+    await viewDtr(id, "2026-10");
+    await expect(page.getByRole("heading", { level: 2 })).toContainText(id);
+    await expect(page.getByRole("alert")).toHaveCount(0);
+    await expect(page.getByRole("row").filter({ hasText: /2026-10-\d\d/ })).toHaveCount(31);
+    await expect(page.getByRole("row").filter({ hasText: "Absent" })).toHaveCount(0);
+    await expect(page.getByRole("row").filter({ hasText: "Totals" })).toContainText("Required — · Absences 0");
+  });
+});
+
+// US-10. Electron opens a native Save dialog for downloads; the test sets the save path instead.
+test.describe("US-10 Export CSV", () => {
+  test.beforeEach(() => login());
+
+  const HEADER = "Employee ID,Name,Rendered (min),Required (min),Missing (min),Late (min),Undertime (min),Absences\r\n";
+
+  function saveNextDownload() {
+    const file = path.join(os.tmpdir(), `e2e-${Date.now()}.csv`);
+    const done = app.evaluate(
+      ({ session }, file) =>
+        new Promise((resolve) => {
+          session.defaultSession.once("will-download", (_e, item) => {
+            item.setSavePath(file);
+            item.once("done", (_e, state) => resolve({ state, name: item.getFilename() }));
+          });
+        }),
+      file,
+    );
+    return done.then((d) => ({ ...d, text: fs.readFileSync(file, "utf8") }));
+  }
+
+  test("Export CSV saves totals for the month", async () => {
+    const a = newId();
+    await createEmployee(a, 'E2E "Q", Tester');
+    await expect(rowFor(a)).toBeVisible();
+    seedPunch(a, "08:00", "17:00");
+    const b = newId();
+    await createEmployee(b);
+    seedPunch(b, "08:00", "17:00");
+    await rowFor(b).getByRole("button", { name: "Deactivate" }).click();
+    await expect(rowFor(b)).toContainText("Inactive");
+    const c = newId();
+    await createEmployee(c);
+    await rowFor(c).getByRole("button", { name: "Deactivate" }).click();
+    await expect(rowFor(c)).toContainText("Inactive");
+
+    await page.getByRole("tab", { name: "DTR" }).click();
+    await page.getByLabel("Month").fill(SEED_DATE.slice(0, 7));
+    const saved = saveNextDownload();
+    await page.getByRole("button", { name: "Export CSV" }).click();
+    const { state, name, text } = await saved;
+    expect([state, name]).toEqual(["completed", `attendance-${SEED_DATE.slice(0, 7)}.csv`]);
+    expect(text.startsWith(`\ufeff${HEADER}`)).toBe(true);
+    expect(text).toContain(`\r\n${a},"E2E ""Q"", Tester",480,480,0,0,0,0\r\n`);
+    expect(text).toContain(`\r\n${b},E2E Tester,480,480,0,0,0,0\r\n`);
+    expect(text).not.toContain(c);
+    await expect(page.getByRole("status")).toHaveText(/^Exported \d+ employees$/);
+  });
+
+  test("Export CSV is disabled with no month", async () => {
+    await page.getByRole("tab", { name: "DTR" }).click();
+    await page.getByLabel("Month").fill("");
+    await expect(page.getByRole("button", { name: "Export CSV" })).toBeDisabled();
   });
 });
