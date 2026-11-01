@@ -18,6 +18,7 @@ import type * as http from "../http.js";
 import type * as lib_admin from "../lib/admin.js";
 import type * as lib_dtr from "../lib/dtr.js";
 import type * as lib_manila from "../lib/manila.js";
+import type * as self from "../self.js";
 
 import type {
   ApiFromModules,
@@ -36,6 +37,7 @@ declare const fullApi: ApiFromModules<{
   "lib/admin": typeof lib_admin;
   "lib/dtr": typeof lib_dtr;
   "lib/manila": typeof lib_manila;
+  self: typeof self;
 }>;
 
 /**

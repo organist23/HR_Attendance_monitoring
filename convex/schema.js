@@ -18,6 +18,7 @@ export default defineSchema({
     active: v.optional(v.boolean()),
     deactivatedOn: v.optional(v.string()), // Manila date; absences stop from this day
     searchText: v.optional(v.string()),
+    passwordChangedAt: v.optional(v.number()), // unset = temporary password, change forced (US-7)
   })
     .index("email", ["email"])
     .index("phone", ["phone"])
