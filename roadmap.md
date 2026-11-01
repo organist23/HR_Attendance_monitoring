@@ -116,8 +116,21 @@ Conventions later phases inherit:
 
 Deliberately not built, and why: hosting the web build (not in the spec, only `vite preview` locally), employee self-service password reset (not in the spec), signing out a deactivated employee's sessions (they reach no data).
 
-### Phase 4 — Reports NEXT
+### Phase 4 — Reports ✅ DONE (merged `957bd25`, 2026-11-01)
 
 Covers US-9, US-10.
 
 - Printable per-employee DTR and a monthly CSV of all employees
+
+**Verified** on 2026-11-01. Backend `npm test` 107/107. Playwright over Electron and in system Chrome ran in a throwaway Convex project under the `e2e-testing` skill: 36 pass and 4 skipped. The 4 skipped tests are the Phase 0/1 weekday-only punch tests and still need a weekday run. Results: `PHASE-4-TEST-RESULTS.md`.
+
+Shipped as:
+- `convex/attendance.js`: `monthlyCsv({ month, today })` returns `{ count, csv }`, one row per employee from `monthFor`, durations in minutes, with a formula-injection guard and CSV quoting.
+- `hr/DTR.jsx`: a Print button (`window.print()`) and an Export CSV button that saves `attendance-<month>.csv` with a UTF-8 BOM through Electron's native Save dialog.
+- `hr/styles.css`: `@media print` hides `header` and `.no-print`.
+
+Picked up from Phase 1 and Phase 3: CSV totals come from `monthFor`, and the month is checked with `isMonth`.
+
+Decisions made with the user: CSV durations are whole minutes.
+
+Deliberately not built, and why: a separate print layout or signature block (the US-9 print view is the DTR table itself), changes to `electron/main.cjs` (Electron's default download handling shows the Save dialog).
