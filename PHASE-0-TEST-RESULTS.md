@@ -53,5 +53,16 @@ Pass run under `.claude/skills/e2e-testing` (feature-workflow step 8).
 ## Left behind
 - Nothing. The developer deleted the Convex project `hr-e2e-phase0` in the dashboard (2026-11-01).
 
+## Re-run after step 10 fixes (commit `058548c`)
+
+The code-review fixes were the temporary password floor, the trimmed sign-in username, Today skipping deleted users, and the shared workday rule in the E2E file.
+
+- **Date:** 2026-11-01 (Sunday). **Test deployment:** throwaway project `hr-e2e-phase0b`, deployment `helpful-crow-6`.
+- **Isolation checks:** all 4 passed before the run.
+- **Backend:** `npm test` 36/36.
+- **E2E:** 12 pass, 3 skipped (the same workday-only tests), 0 fail, exit 0. Per-test results match the tables above.
+- **Teardown:** purge removed users 7, accounts 7, attendance 0, sessions 0, refresh tokens 0. `.env.local` was restored to dev, `.env.e2e` removed, and `dist/hr` rebuilt and checked against dev.
+- **Left behind:** the Convex project `hr-e2e-phase0b`, until the developer deletes it in the dashboard.
+
 ## Open
 - On a weekday (Manila), run a new pass under the e2e-testing skill to execute the 3 skipped workday tests.
