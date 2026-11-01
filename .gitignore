@@ -3,3 +3,4 @@ dist
 .env.local
 test-results
 playwright-report
+.env.e2e
