@@ -21,7 +21,8 @@ export default function Login({ title = "HR Attendance", userLabel = "Username" 
       });
     } catch (err) {
       // Server rules (e.g. "Account inactive") come as ConvexError; a wrong password does not.
-      setError(err instanceof ConvexError ? err.data : `Invalid ${userLabel.toLowerCase()} or password`);
+      const what = userLabel[0].toLowerCase() + userLabel.slice(1); // "username", "employee ID"
+      setError(err instanceof ConvexError ? err.data : `Invalid ${what} or password`);
       setPending(false);
     }
   }

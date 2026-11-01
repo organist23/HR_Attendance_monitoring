@@ -1,5 +1,5 @@
 import { _electron as electron, expect, test } from "@playwright/test";
-import { execFileSync } from "node:child_process";
+import { SEED_DATE, seedPunchOn } from "./seed.js";
 import { isWorkday as isWorkdayRule, manilaDay } from "../convex/lib/manila.js";
 
 const USER = process.env.E2E_ADMIN_USER;
@@ -282,19 +282,7 @@ test.describe("US-4 Monthly DTR", () => {
 
 // US-6. The UI only punches today, so each test seeds a past Friday through e2e:seedPunch
 // (gated like purge) and runs on any day of the week.
-const SEED_DATE = "2026-10-30";
-const atManila = (time) => Date.parse(`${SEED_DATE}T${time.padEnd(8, ":00")}+08:00`); // "HH:MM" or "HH:MM:SS"
-
-function seedPunch(employeeId, timeIn, timeOut) {
-  const deployment = process.env.E2E_DEPLOYMENT;
-  if (!deployment) throw new Error("Set E2E_DEPLOYMENT in .env.e2e");
-  const args = { employeeId, date: SEED_DATE, timeIn: atManila(timeIn), ...(timeOut && { timeOut: atManila(timeOut) }) };
-  execFileSync(
-    process.execPath,
-    ["node_modules/convex/bin/main.js", "run", "--deployment", deployment, "e2e:seedPunch", JSON.stringify(args)],
-    { stdio: "pipe" },
-  );
-}
+const seedPunch = (employeeId, timeIn, timeOut) => seedPunchOn(employeeId, SEED_DATE, timeIn, timeOut);
 
 test.describe("US-6 Corrections", () => {
   test.beforeEach(() => login());

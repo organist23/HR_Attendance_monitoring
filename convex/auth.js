@@ -13,8 +13,10 @@ const password = Password({
 
 // US-7: an inactive employee can't sign in. Runs after the password check, so it reveals nothing
 // to someone without the password.
-const checkPassword = password.authorize;
-password.authorize = async (params, ctx) => {
+// shortcut: the real authorize lives on `options` (internal in @convex-dev/auth 0.0.96); the E2E
+// "inactive employee can't log in" test catches it if an upgrade moves it.
+const checkPassword = password.options.authorize;
+password.options.authorize = async (params, ctx) => {
   const result = await checkPassword(params, ctx);
   const user = await ctx.runQuery(internal.admin.getUser, { userId: result.userId });
   if (user?.role === "employee" && user.active !== true) throw new ConvexError("Account inactive");

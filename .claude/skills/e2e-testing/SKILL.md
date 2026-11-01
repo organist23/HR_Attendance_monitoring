@@ -5,8 +5,9 @@ description: Use when a change to the HR Attendance System has to be proven end 
 
 # End-to-end testing: HR Attendance System
 
-> Used during `feature-workflow` step 8 (Real-world E2E). Driver: Playwright over
-> Electron (`e2e/hr.spec.js`), per CLAUDE.md "Project facts".
+> Used during `feature-workflow` step 8 (Real-world E2E). Drivers: Playwright over
+> Electron (`e2e/hr.spec.js`) and Playwright in system Chrome for the employee web app
+> (`e2e/web.spec.js`, served by `vite preview`), per CLAUDE.md "Project facts".
 
 **Never run a pass against the developer's dev deployment `woozy-nightingale-996`
 or any production deployment.** Every pass gets its own throwaway Convex project,
@@ -18,7 +19,7 @@ the developer's own data and the shared `admin` login.
 | Thing | Pass uses | Never |
 |---|---|---|
 | Convex deployment | a new project `hr-e2e-<pass>` created for this pass | `woozy-nightingale-996`, anything `prod` |
-| App build | `dist/hr` built while `.env.local` points at the test deployment | a build pointing at dev |
+| App build | `dist/hr` and `dist/web` built while `.env.local` points at the test deployment | a build pointing at dev |
 | Admin login | `e2e-admin` with a random password generated for this pass, stored only in `.env.e2e` | the developer's `admin` account |
 | Test data | employees whose ID starts with `E2E-` | any other ID |
 | Purge | `e2e:purge`, which runs only where `E2E_PURGE_ALLOWED=true` is set | setting that var anywhere except the test deployment, or briefly on dev for the one-off leftover cleanup |
@@ -61,8 +62,8 @@ for the developer.
 ## Prove the isolation before creating anything
 
 1. **The build points at the test deployment:**
-   `grep -l "$TEST_DEPLOYMENT" dist/hr/assets/*.js` lists a file, and
-   `grep -l woozy-nightingale-996 dist/hr/assets/*.js` lists nothing.
+   `grep -l "$TEST_DEPLOYMENT" dist/hr/assets/*.js dist/web/assets/*.js` lists both builds, and
+   `grep -l woozy-nightingale-996 dist/hr/assets/*.js dist/web/assets/*.js` lists nothing.
 2. **The test deployment is fresh:** it has exactly one user, `e2e-admin`.
    Check with `npx convex data users --deployment "${TEST_DEPLOYMENT:?}"`.
 3. **You are testing the code you think you are:**
@@ -95,7 +96,7 @@ npx convex run --deployment "${TEST_DEPLOYMENT:?}" e2e:purge '{"prefix":"E2E-"}'
 mv .env.local.dev-backup .env.local
 rm -f .env.e2e
 npm run build
-grep -l woozy-nightingale-996 dist/hr/assets/*.js   # must list a file
+grep -l woozy-nightingale-996 dist/hr/assets/*.js dist/web/assets/*.js   # must list both
 ```
 
 3. **Delete the Convex project `hr-e2e-<pass>`.** The developer does this in the
@@ -120,7 +121,7 @@ npx convex env list --deployment woozy-nightingale-996   # E2E_PURGE_ALLOWED mus
 | Symptom | Cause |
 |---|---|
 | Setup prints `STOP` or `parameter null or not set` | step 1 failed, or `.env.local` still points at dev. Fix that before anything else |
-| Test employees show up in the developer's dev app | `dist/hr` was built before step 1, so it points at dev. Rebuild and re-check isolation step 1 |
+| Test employees show up in the developer's dev app | `dist` was built before step 1, so it points at dev. Rebuild and re-check isolation step 1 |
 | `e2e:purge` says "E2E purge disabled on this deployment" | the gate var is not set there. That is correct for dev and prod |
 | Electron "Process failed to launch!" / "bad option" | the VS Code terminal sets `ELECTRON_RUN_AS_NODE=1`. The spec strips it, so do not remove that line |
 | Suite exits 1 with no failed test ("worker teardown timeout") | the Electron app did not exit. The spec's `afterEach` exits it with `app.exit(0)`, so keep that |
