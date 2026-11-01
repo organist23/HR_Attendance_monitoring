@@ -27,8 +27,13 @@ function Correction({ employeeId, day, onClose }) {
   const [pending, setPending] = useState(false);
   const [error, setError] = useState("");
   const first = useRef(null);
+  const reasonInput = useRef(null);
 
   useEffect(() => first.current?.focus(), []);
+  // Inputs are disabled while saving, which drops focus; bring it back after an error.
+  useEffect(() => {
+    if (error) reasonInput.current?.focus();
+  }, [error]);
 
   async function submit(e) {
     e.preventDefault();
@@ -75,7 +80,7 @@ function Correction({ employeeId, day, onClose }) {
           </label>
           <label>
             Reason
-            <input value={reason} onChange={(e) => setReason(e.target.value)} disabled={pending} />
+            <input ref={reasonInput} value={reason} onChange={(e) => setReason(e.target.value)} disabled={pending} />
           </label>
           <button type="submit" disabled={pending}>
             {pending ? "Saving…" : "Save"}

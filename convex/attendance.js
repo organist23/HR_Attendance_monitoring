@@ -155,17 +155,21 @@ export const correct = mutation({
     }
     const now = Date.now();
     if (Object.values(changes).some((ms) => ms > now)) throw new ConvexError("Time is in the future");
-    const timeIn = changes.timeIn ?? row.timeIn;
-    const timeOut = changes.timeOut ?? row?.timeOut;
-    if (timeOut !== undefined && timeOut <= timeIn) throw new ConvexError("Time-out must be after time-in");
 
+    // Inputs have minute precision and punches have seconds: the same minute is no change.
+    const minute = (ms) => Math.floor(ms / 60_000);
+    const next = { timeIn: row?.timeIn, timeOut: row?.timeOut };
     const entries = [];
     for (const field of ["timeIn", "timeOut"]) {
       const to = changes[field];
       const from = row?.[field];
-      if (to !== undefined && to !== from) entries.push({ field, ...(from !== undefined && { from }), to, reason, at: now });
+      if (to === undefined || (from !== undefined && minute(to) === minute(from))) continue;
+      next[field] = to;
+      entries.push({ field, ...(from !== undefined && { from }), to, reason, at: now });
     }
     if (!entries.length) throw new ConvexError("Nothing to change");
+    const { timeIn, timeOut } = next;
+    if (timeOut !== undefined && timeOut <= timeIn) throw new ConvexError("Time-out must be after time-in");
     const corrections = [...(row?.corrections ?? []), ...entries];
     if (row) await ctx.db.patch(row._id, { timeIn, timeOut, corrections });
     else await ctx.db.insert("attendance", { userId: employee._id, date, timeIn, timeOut, corrections });

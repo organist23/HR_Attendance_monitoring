@@ -386,6 +386,16 @@ test("correct: unchanged or empty call rejected", async () => {
   expect((await day("2026-11-03")).corrections).toEqual([]);
 });
 
+test("correct: same minute as a punch with seconds is unchanged", async () => {
+  const { t, userId, correct, rows } = await correctSetup();
+  const timeIn = manila("2026-11-03", "08:00") + 45_000; // 08:00:45
+  await t.run((ctx) => ctx.db.insert("attendance", { userId, date: "2026-11-03", timeIn }));
+  await expect(correct({ date: "2026-11-03", timeIn: "08:00" })).rejects.toThrow("Nothing to change");
+  await correct({ date: "2026-11-03", timeIn: "08:00", timeOut: "17:00" });
+  const [row] = await rows();
+  expect([row.timeIn, row.corrections.map((c) => c.field)]).toEqual([timeIn, ["timeOut"]]);
+});
+
 test("correct: unknown employee and non-admin rejected", async () => {
   const { correct } = await correctSetup();
   await expect(correct({ employeeId: "E999", date: "2026-11-03", timeIn: "08:00" })).rejects.toThrow("Employee not found");

@@ -346,6 +346,7 @@ test.describe("US-6 Corrections", () => {
     await seededDtr();
     await submitCorrection({ timeOut: "17:00", reason: "" });
     await expect(page.getByRole("alert")).toHaveText("Reason is required");
+    await expect(page.getByLabel("Reason")).toBeFocused(); // focus returns to the form after an error
     await page.getByRole("button", { name: "Cancel" }).click();
     await expect(day()).toContainText("Incomplete");
     await expect(cell(3)).toHaveText("—");
