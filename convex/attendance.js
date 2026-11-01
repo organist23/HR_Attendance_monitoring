@@ -2,7 +2,7 @@ import { ConvexError, v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 import { requireAdmin } from "./lib/admin";
 import { computeDay } from "./lib/dtr";
-import { isWorkday, manilaDay } from "./lib/manila";
+import { isRealDate, isWorkday, manilaDay } from "./lib/manila";
 
 export const punch = mutation({
   args: { employeeId: v.string() },
@@ -102,8 +102,73 @@ export const monthly = query({
         for (const k of ["rendered", "missing", "late", "undertime"]) totals[k] += computed[k];
         if (computed.status === "Absent") totals.absences += 1;
       }
-      days.push({ date, weekday, holiday, timeIn: row?.timeIn, timeOut: row?.timeOut, ...computed });
+      days.push({
+        date, weekday, holiday, timeIn: row?.timeIn, timeOut: row?.timeOut, corrections: row?.corrections ?? [], ...computed,
+      });
     }
     return { employeeId: user.employeeId, name: user.name, days, totals };
+  },
+});
+
+// US-6. Times are Manila "HH:MM" on `date`; only the fields given are changed.
+export const correct = mutation({
+  args: {
+    employeeId: v.string(),
+    date: v.string(),
+    timeIn: v.optional(v.string()),
+    timeOut: v.optional(v.string()),
+    reason: v.string(),
+  },
+  handler: async (ctx, args) => {
+    await requireAdmin(ctx);
+    const reason = args.reason.trim();
+    if (!reason) throw new ConvexError("Reason is required");
+    if (reason.length > 500) throw new ConvexError("Reason is too long");
+    const { date } = args;
+    if (!isRealDate(date)) throw new ConvexError("Invalid date");
+    const toMs = (hhmm) => {
+      if (hhmm === undefined) return undefined;
+      if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(hhmm)) throw new ConvexError("Invalid time");
+      return Date.parse(`${date}T${hhmm}:00+08:00`);
+    };
+    const changes = { timeIn: toMs(args.timeIn), timeOut: toMs(args.timeOut) };
+    if (changes.timeIn === undefined && changes.timeOut === undefined) throw new ConvexError("Nothing to change");
+
+    const employee = await ctx.db
+      .query("users")
+      .withIndex("by_employeeId", (q) => q.eq("employeeId", args.employeeId.trim()))
+      .first();
+    if (employee?.role !== "employee") throw new ConvexError("Employee not found");
+
+    const row = await ctx.db
+      .query("attendance")
+      .withIndex("by_user_date", (q) => q.eq("userId", employee._id).eq("date", date))
+      .unique();
+    if (!row) {
+      const holiday = await ctx.db
+        .query("holidays")
+        .withIndex("by_date", (q) => q.eq("date", date))
+        .first();
+      const weekday = new Date(`${date}T00:00:00Z`).getUTCDay();
+      if (!isWorkday(weekday) || holiday) throw new ConvexError("Not a workday");
+      if (changes.timeIn === undefined) throw new ConvexError("Time-in is required");
+    }
+    const now = Date.now();
+    if (Object.values(changes).some((ms) => ms > now)) throw new ConvexError("Time is in the future");
+    const timeIn = changes.timeIn ?? row.timeIn;
+    const timeOut = changes.timeOut ?? row?.timeOut;
+    if (timeOut !== undefined && timeOut <= timeIn) throw new ConvexError("Time-out must be after time-in");
+
+    const entries = [];
+    for (const field of ["timeIn", "timeOut"]) {
+      const to = changes[field];
+      const from = row?.[field];
+      if (to !== undefined && to !== from) entries.push({ field, ...(from !== undefined && { from }), to, reason, at: now });
+    }
+    if (!entries.length) throw new ConvexError("Nothing to change");
+    const corrections = [...(row?.corrections ?? []), ...entries];
+    if (row) await ctx.db.patch(row._id, { timeIn, timeOut, corrections });
+    else await ctx.db.insert("attendance", { userId: employee._id, date, timeIn, timeOut, corrections });
+    return null;
   },
 });

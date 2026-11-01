@@ -247,3 +247,159 @@ test("monthly: non-admin rejected", async () => {
     as.query(api.attendance.monthly, { employeeId: "E002", month: "2026-11", today: "2026-11-06" }),
   ).rejects.toThrow("Not authorized");
 });
+
+// Corrections (US-6). Same month setup; now is Fri Nov 6 10:00 Manila.
+const NOW = "2026-11-06T02:00:00Z";
+
+async function correctSetup(opts) {
+  const s = await monthSetup(opts);
+  at(NOW);
+  const correct = (args) => s.as.mutation(api.attendance.correct, { employeeId: "E001", reason: "Forgot", ...args });
+  const day = async (date) => byDate(await s.monthly())[date];
+  const rows = () => s.t.run((ctx) => ctx.db.query("attendance").collect());
+  return { ...s, correct, day, rows };
+}
+
+test("correct: time-out edit recomputes and logs", async () => {
+  const { punched, correct, day } = await correctSetup();
+  await punched("2026-11-03", "08:00", "16:00");
+  await correct({ date: "2026-11-03", timeOut: "17:00" });
+  const d = await day("2026-11-03");
+  expect(pick(d)).toEqual([480, 0, 0, 0, "Present"]);
+  expect(d.timeOut).toBe(manila("2026-11-03", "17:00"));
+  expect(d.corrections).toEqual([
+    { field: "timeOut", from: manila("2026-11-03", "16:00"), to: manila("2026-11-03", "17:00"), reason: "Forgot", at: Date.parse(NOW) },
+  ]);
+});
+
+test("correct: time-in edit clears lateness", async () => {
+  const { punched, correct, day } = await correctSetup();
+  await punched("2026-11-03", "08:20", "17:00");
+  await correct({ date: "2026-11-03", timeIn: "08:00" });
+  expect(pick(await day("2026-11-03"))).toEqual([480, 0, 0, 0, "Present"]);
+});
+
+test("correct: adds missing time-out to Incomplete day", async () => {
+  const { punched, correct, day } = await correctSetup();
+  await punched("2026-11-03", "08:00");
+  expect((await day("2026-11-03")).status).toBe("Incomplete");
+  await correct({ date: "2026-11-03", timeOut: "17:00" });
+  const d = await day("2026-11-03");
+  expect(pick(d)).toEqual([480, 0, 0, 0, "Present"]);
+  expect(d.corrections).toEqual([{ field: "timeOut", to: manila("2026-11-03", "17:00"), reason: "Forgot", at: Date.parse(NOW) }]);
+});
+
+test("correct: Absent day gets a record", async () => {
+  const { correct, monthly } = await correctSetup();
+  expect((await monthly()).totals.absences).toBe(4); // Nov 2 to 5
+  await correct({ date: "2026-11-04", timeIn: "08:00", timeOut: "17:00" });
+  const dtr = await monthly();
+  const d = byDate(dtr)["2026-11-04"];
+  expect(pick(d)).toEqual([480, 0, 0, 0, "Present"]);
+  expect(d.corrections).toEqual([
+    { field: "timeIn", to: manila("2026-11-04", "08:00"), reason: "Forgot", at: Date.parse(NOW) },
+    { field: "timeOut", to: manila("2026-11-04", "17:00"), reason: "Forgot", at: Date.parse(NOW) },
+  ]);
+  expect(dtr.totals.absences).toBe(3);
+});
+
+test("correct: second correction appends", async () => {
+  const { punched, correct, day } = await correctSetup();
+  await punched("2026-11-03", "08:00", "16:00");
+  await correct({ date: "2026-11-03", timeOut: "16:30", reason: "First" });
+  await correct({ date: "2026-11-03", timeOut: "17:00", reason: "Second" });
+  const d = await day("2026-11-03");
+  expect(d.corrections.map((c) => [c.reason, c.from, c.to])).toEqual([
+    ["First", manila("2026-11-03", "16:00"), manila("2026-11-03", "16:30")],
+    ["Second", manila("2026-11-03", "16:30"), manila("2026-11-03", "17:00")],
+  ]);
+});
+
+test("correct: reason trimmed; blank or too long rejected, nothing changes", async () => {
+  const { punched, correct, day } = await correctSetup();
+  await punched("2026-11-03", "08:00", "16:00");
+  await expect(correct({ date: "2026-11-03", timeOut: "17:00", reason: "  " })).rejects.toThrow("Reason is required");
+  await expect(correct({ date: "2026-11-03", timeOut: "17:00", reason: "x".repeat(501) })).rejects.toThrow("Reason is too long");
+  let d = await day("2026-11-03");
+  expect([d.timeOut, d.corrections]).toEqual([manila("2026-11-03", "16:00"), []]);
+  await correct({ date: "2026-11-03", timeOut: "17:00", reason: " Typo " });
+  d = await day("2026-11-03");
+  expect(d.corrections[0].reason).toBe("Typo");
+});
+
+test("correct: time-out not after time-in rejected, row unchanged", async () => {
+  const { punched, correct, rows } = await correctSetup();
+  await punched("2026-11-03", "08:00", "17:00");
+  const before = await rows();
+  for (const args of [{ timeOut: "07:59" }, { timeOut: "08:00" }, { timeIn: "17:00" }]) {
+    await expect(correct({ date: "2026-11-03", ...args })).rejects.toThrow("Time-out must be after time-in");
+  }
+  expect(await rows()).toEqual(before);
+});
+
+test("correct: time-out only on Absent day rejected, no row", async () => {
+  const { correct, rows } = await correctSetup();
+  await expect(correct({ date: "2026-11-04", timeOut: "17:00" })).rejects.toThrow("Time-in is required");
+  expect(await rows()).toHaveLength(0);
+});
+
+test("correct: new record on weekend or holiday rejected", async () => {
+  const { holiday, correct, rows } = await correctSetup();
+  await holiday("2026-11-04");
+  await expect(correct({ date: "2026-10-31", timeIn: "08:00" })).rejects.toThrow("Not a workday"); // Saturday
+  await expect(correct({ date: "2026-11-04", timeIn: "08:00" })).rejects.toThrow("Not a workday");
+  expect(await rows()).toHaveLength(0);
+});
+
+test("correct: existing row on a later holiday can be corrected", async () => {
+  const { punched, holiday, correct, rows } = await correctSetup();
+  await punched("2026-11-04", "08:00", "16:00");
+  await holiday("2026-11-04");
+  await correct({ date: "2026-11-04", timeOut: "17:00" });
+  expect((await rows())[0].timeOut).toBe(manila("2026-11-04", "17:00"));
+});
+
+test("correct: future time rejected", async () => {
+  const { correct, rows } = await correctSetup();
+  await expect(correct({ date: "2026-11-06", timeIn: "08:00", timeOut: "17:00" })).rejects.toThrow("Time is in the future");
+  await expect(correct({ date: "2026-11-09", timeIn: "08:00" })).rejects.toThrow("Time is in the future");
+  expect(await rows()).toHaveLength(0);
+  await correct({ date: "2026-11-06", timeIn: "08:00" }); // 08:00 today is past at 10:00
+  expect(await rows()).toHaveLength(1);
+});
+
+test("correct: invalid date or time rejected", async () => {
+  const { correct, rows } = await correctSetup();
+  await expect(correct({ date: "2026-02-30", timeIn: "08:00" })).rejects.toThrow("Invalid date");
+  await expect(correct({ date: "2026-11-3", timeIn: "08:00" })).rejects.toThrow("Invalid date");
+  for (const timeIn of ["25:00", "8:00", "08:60", ""]) {
+    await expect(correct({ date: "2026-11-03", timeIn })).rejects.toThrow("Invalid time");
+  }
+  expect(await rows()).toHaveLength(0);
+});
+
+test("correct: unchanged or empty call rejected", async () => {
+  const { punched, correct, day } = await correctSetup();
+  await punched("2026-11-03", "08:00", "17:00");
+  await expect(correct({ date: "2026-11-03" })).rejects.toThrow("Nothing to change");
+  await expect(correct({ date: "2026-11-03", timeOut: "17:00" })).rejects.toThrow("Nothing to change");
+  expect((await day("2026-11-03")).corrections).toEqual([]);
+});
+
+test("correct: unknown employee and non-admin rejected", async () => {
+  const { correct } = await correctSetup();
+  await expect(correct({ employeeId: "E999", date: "2026-11-03", timeIn: "08:00" })).rejects.toThrow("Employee not found");
+  await expect(correct({ employeeId: "admin", date: "2026-11-03", timeIn: "08:00" })).rejects.toThrow("Employee not found");
+  const t = convexTest(schema, modules);
+  const { as } = await asRole(t, "employee", { employeeId: "E002", active: true });
+  await expect(
+    as.mutation(api.attendance.correct, { employeeId: "E002", date: "2026-11-03", timeIn: "08:00", reason: "x" }),
+  ).rejects.toThrow("Not authorized");
+});
+
+test("correct: inactive employee can be corrected", async () => {
+  const { punched, correct, rows } = await correctSetup({ active: false });
+  await punched("2026-11-03", "08:00", "16:00");
+  await correct({ date: "2026-11-03", timeOut: "17:00" });
+  expect((await rows())[0].timeOut).toBe(manila("2026-11-03", "17:00"));
+});
