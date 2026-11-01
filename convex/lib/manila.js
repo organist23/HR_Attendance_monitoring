@@ -13,3 +13,9 @@ export function manilaMinutes(ms) {
 export function isWorkday(weekday) {
   return weekday >= 1 && weekday <= 5;
 }
+
+// Round-trip through Date rejects impossible dates like 2026-02-30.
+export function isRealDate(date) {
+  const ms = Date.parse(`${date}T00:00:00Z`);
+  return /^\d{4}-\d{2}-\d{2}$/.test(date) && !Number.isNaN(ms) && new Date(ms).toISOString().startsWith(date);
+}

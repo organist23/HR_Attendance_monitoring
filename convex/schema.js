@@ -28,6 +28,18 @@ export default defineSchema({
     date: v.string(),
     timeIn: v.number(),
     timeOut: v.optional(v.number()),
+    // US-6 log, oldest first. `from` is absent when the field had no value.
+    corrections: v.optional(
+      v.array(
+        v.object({
+          field: v.union(v.literal("timeIn"), v.literal("timeOut")),
+          from: v.optional(v.number()),
+          to: v.number(),
+          reason: v.string(),
+          at: v.number(),
+        }),
+      ),
+    ),
   })
     .index("by_user_date", ["userId", "date"])
     .index("by_date", ["date"]),

@@ -1,6 +1,21 @@
 import { v } from "convex/values";
 import { internalMutation } from "./_generated/server";
 
+// E2E setup: a punch on a past date, which the UI cannot make. Same gate as purge.
+export const seedPunch = internalMutation({
+  args: { employeeId: v.string(), date: v.string(), timeIn: v.number(), timeOut: v.optional(v.number()) },
+  handler: async (ctx, { employeeId, ...row }) => {
+    if (process.env.E2E_PURGE_ALLOWED !== "true") throw new Error("E2E purge disabled on this deployment");
+    if (!employeeId.startsWith("E2E-")) throw new Error("Employee must start with E2E-");
+    const user = await ctx.db
+      .query("users")
+      .withIndex("by_employeeId", (q) => q.eq("employeeId", employeeId))
+      .first();
+    if (user?.role !== "employee") throw new Error("Employee not found");
+    await ctx.db.insert("attendance", { userId: user._id, ...row });
+  },
+});
+
 // Teardown for E2E passes (see .claude/skills/e2e-testing). Internal only, and refuses to run
 // unless the deployment has E2E_PURGE_ALLOWED=true, which only throwaway test projects set.
 export const purge = internalMutation({
