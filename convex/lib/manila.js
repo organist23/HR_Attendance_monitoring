@@ -6,6 +6,10 @@ export function manilaDay(ms) {
   return { date: d.toISOString().slice(0, 10), weekday: d.getUTCDay() };
 }
 
+export function manilaMinutes(ms) {
+  return Math.floor(((ms + OFFSET_MS) % 86_400_000) / 60_000);
+}
+
 export function isWorkday(weekday) {
   return weekday >= 1 && weekday <= 5;
 }

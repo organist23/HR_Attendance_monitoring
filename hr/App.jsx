@@ -2,11 +2,14 @@ import { useAuthActions } from "@convex-dev/auth/react";
 import { useConvexAuth, useQuery } from "convex/react";
 import { api } from "../convex/_generated/api";
 import { useRef, useState } from "react";
+import DTR from "./DTR";
 import Employees from "./Employees";
+import Holidays from "./Holidays";
 import Login from "./Login";
 import Punch from "./Punch";
 
-const TABS = ["Punch", "Employees"];
+const PANELS = { Punch, Employees, DTR, Holidays };
+const TABS = Object.keys(PANELS);
 
 export default function App() {
   const { isLoading, isAuthenticated } = useConvexAuth();
@@ -40,6 +43,7 @@ export default function App() {
     tabRefs.current[next]?.focus();
   }
 
+  const Panel = PANELS[tab];
   return (
     <div className="app">
       <header>
@@ -65,7 +69,7 @@ export default function App() {
         </button>
       </header>
       <section role="tabpanel" id="panel" aria-labelledby={`tab-${tab}`}>
-        {tab === "Punch" ? <Punch /> : <Employees />}
+        <Panel />
       </section>
     </div>
   );

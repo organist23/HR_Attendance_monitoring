@@ -188,3 +188,92 @@ test.describe("US-3 Record punch", () => {
     });
   });
 });
+
+// Holiday helpers. Dates are in the current Manila month (so the DTR shows them) and never today.
+const today = () => manilaDay(Date.now()).date;
+const dateInMonth = (day) => `${today().slice(0, 8)}${String(day).padStart(2, "0")}`;
+const notToday = (day) => (dateInMonth(day) === today() ? dateInMonth(day - 1) : dateInMonth(day));
+// A date no earlier run used, so leftovers from an unpurged run can't collide.
+const uniqueDate = () => `${2100 + Math.floor(Math.random() * 7000)}-01-15`;
+
+async function addHoliday(date, name) {
+  await page.getByRole("tab", { name: "Holidays" }).click();
+  await page.getByLabel("Date").fill(date);
+  await page.getByLabel("Holiday name").fill(name);
+  await page.getByRole("button", { name: "Add holiday" }).click();
+}
+
+async function viewDtr(employeeId) {
+  await page.getByRole("tab", { name: "DTR" }).click();
+  await page.getByLabel("Employee ID").fill(employeeId);
+  await page.getByLabel("Employee ID").press("Enter");
+}
+
+// US-5
+test.describe("US-5 Manage holidays", () => {
+  test.beforeEach(() => login());
+
+  test("added holiday appears in list and drops out of the DTR", async () => {
+    const name = `E2E-Holiday-${Date.now()}`;
+    const date = notToday(28);
+    await addHoliday(date, name);
+    await expect(rowFor(name)).toContainText(date);
+    const id = newId();
+    await createEmployee(id);
+    await expect(rowFor(id)).toBeVisible();
+    await viewDtr(id);
+    await expect(page.getByRole("row").filter({ hasText: date })).toContainText(name);
+    // Fixed date in this month: remove it so a re-run before purge doesn't hit a duplicate.
+    await page.getByRole("tab", { name: "Holidays" }).click();
+    await rowFor(name).getByRole("button", { name: "Remove" }).click();
+    await expect(rowFor(name)).toHaveCount(0);
+  });
+
+  test("duplicate date shows error", async () => {
+    const date = uniqueDate();
+    await addHoliday(date, `E2E-First-${Date.now()}`);
+    await expect(rowFor(date)).toBeVisible();
+    await addHoliday(date, `E2E-Second-${Date.now()}`);
+    await expect(page.getByRole("alert")).toHaveText("Date is already a holiday");
+    await expect(rowFor(date)).toHaveCount(1);
+  });
+
+  test("remove drops the holiday", async () => {
+    const name = `E2E-Remove-${Date.now()}`;
+    await addHoliday(uniqueDate(), name);
+    await expect(rowFor(name)).toBeVisible();
+    await rowFor(name).getByRole("button", { name: "Remove" }).click();
+    await expect(rowFor(name)).toHaveCount(0);
+  });
+});
+
+// US-4
+test.describe("US-4 Monthly DTR", () => {
+  test.beforeEach(() => login());
+
+  test("DTR shows the employee's month with today's row and totals", async () => {
+    const id = newId();
+    await createEmployee(id, "E2E Dtr");
+    await expect(rowFor(id)).toBeVisible();
+    await viewDtr(id);
+    await expect(page.getByRole("heading", { level: 2 })).toContainText(`${id} E2E Dtr`);
+    await expect(page.getByRole("row").filter({ hasText: today() })).toBeVisible();
+    await expect(page.getByRole("row").filter({ hasText: "Totals" })).toContainText("Absences 0");
+  });
+
+  test("unknown ID shows Employee not found", async () => {
+    await viewDtr("NOPE-000");
+    await expect(page.getByRole("alert")).toHaveText("Employee not found");
+  });
+
+  test("time-in only shows Incomplete for today", async () => {
+    test.skip(!isWorkday, "server rejects weekend punches; run Monday-Friday Manila time");
+    const id = newId();
+    await createEmployee(id);
+    await expect(rowFor(id)).toBeVisible();
+    await punch(id);
+    await expect(rowFor(id)).toContainText("Timed in");
+    await viewDtr(id);
+    await expect(page.getByRole("row").filter({ hasText: today() })).toContainText("Incomplete");
+  });
+});

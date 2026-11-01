@@ -5,7 +5,7 @@ import { manilaDay } from "../convex/lib/manila";
 import { errorText } from "./errors";
 
 // Re-checks every minute so the Today list rolls over at Manila midnight.
-function useManilaDate() {
+export function useManilaDate() {
   const [date, setDate] = useState(() => manilaDay(Date.now()).date);
   useEffect(() => {
     const id = setInterval(() => setDate(manilaDay(Date.now()).date), 60_000);
@@ -14,7 +14,7 @@ function useManilaDate() {
   return date;
 }
 
-const manilaTime = (ms) =>
+export const manilaTime = (ms) =>
   new Date(ms).toLocaleTimeString("en-PH", {
     timeZone: "Asia/Manila",
     hour: "2-digit",

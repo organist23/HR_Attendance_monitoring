@@ -13,8 +13,10 @@ import type * as attendance from "../attendance.js";
 import type * as auth from "../auth.js";
 import type * as e2e from "../e2e.js";
 import type * as employees from "../employees.js";
+import type * as holidays from "../holidays.js";
 import type * as http from "../http.js";
 import type * as lib_admin from "../lib/admin.js";
+import type * as lib_dtr from "../lib/dtr.js";
 import type * as lib_manila from "../lib/manila.js";
 
 import type {
@@ -29,8 +31,10 @@ declare const fullApi: ApiFromModules<{
   auth: typeof auth;
   e2e: typeof e2e;
   employees: typeof employees;
+  holidays: typeof holidays;
   http: typeof http;
   "lib/admin": typeof lib_admin;
+  "lib/dtr": typeof lib_dtr;
   "lib/manila": typeof lib_manila;
 }>;
 

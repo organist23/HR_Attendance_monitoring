@@ -16,6 +16,7 @@ export default defineSchema({
     role: v.optional(v.union(v.literal("admin"), v.literal("employee"))),
     employeeId: v.optional(v.string()),
     active: v.optional(v.boolean()),
+    deactivatedOn: v.optional(v.string()), // Manila date; absences stop from this day
     searchText: v.optional(v.string()),
   })
     .index("email", ["email"])
@@ -30,4 +31,5 @@ export default defineSchema({
   })
     .index("by_user_date", ["userId", "date"])
     .index("by_date", ["date"]),
+  holidays: defineTable({ date: v.string(), name: v.string() }).index("by_date", ["date"]),
 });

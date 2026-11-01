@@ -4,6 +4,7 @@ import { ConvexError, v } from "convex/values";
 import { internal } from "./_generated/api";
 import { action, internalQuery, mutation, query } from "./_generated/server";
 import { requireAdmin } from "./lib/admin";
+import { manilaDay } from "./lib/manila";
 
 export const byEmployeeId = internalQuery({
   args: { employeeId: v.string() },
@@ -77,6 +78,6 @@ export const setActive = mutation({
     await requireAdmin(ctx);
     const user = await ctx.db.get(userId);
     if (user?.role !== "employee") throw new ConvexError("Employee not found");
-    await ctx.db.patch(userId, { active });
+    await ctx.db.patch(userId, { active, deactivatedOn: active ? undefined : manilaDay(Date.now()).date });
   },
 });
