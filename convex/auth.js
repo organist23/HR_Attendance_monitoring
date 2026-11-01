@@ -17,7 +17,10 @@ const password = Password({
 // "inactive employee can't log in" test catches it if an upgrade moves it.
 const checkPassword = password.options.authorize;
 password.options.authorize = async (params, ctx) => {
-  const result = await checkPassword(params, ctx);
+  // The library locks an account after 10 failed attempts an hour; say so instead of "invalid".
+  const result = await checkPassword(params, ctx).catch((err) => {
+    throw /TooManyFailedAttempts/.test(err.message) ? new ConvexError("Too many attempts. Try again later.") : err;
+  });
   const user = await ctx.runQuery(internal.admin.getUser, { userId: result.userId });
   if (user?.role === "employee" && user.active !== true) throw new ConvexError("Account inactive");
   return result;

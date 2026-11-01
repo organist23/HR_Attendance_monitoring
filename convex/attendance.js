@@ -2,7 +2,7 @@ import { ConvexError, v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 import { requireAdmin } from "./lib/admin";
 import { computeDay } from "./lib/dtr";
-import { isRealDate, isWorkday, manilaDay } from "./lib/manila";
+import { isMonth, isRealDate, isWorkday, manilaDay } from "./lib/manila";
 
 export const punch = mutation({
   args: { employeeId: v.string() },
@@ -79,7 +79,7 @@ export const monthly = query({
 
 // The one DTR month builder: HR's `monthly` and the employee's `self.monthly` both use it.
 export async function monthFor(ctx, user, month, today) {
-  if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(month)) throw new ConvexError("Invalid month");
+  if (!isMonth(month)) throw new ConvexError("Invalid month");
   const inMonth = (q) => q.gte("date", `${month}-01`).lte("date", `${month}-31`);
   const rows = await ctx.db
     .query("attendance")

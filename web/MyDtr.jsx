@@ -1,6 +1,7 @@
 import { useQuery } from "convex/react";
 import { useState } from "react";
 import { api } from "../convex/_generated/api";
+import { isMonth } from "../convex/lib/manila";
 import { DayCells, DayHeaders, TotalCells } from "../hr/DTR";
 import { useManilaDate } from "../hr/Punch";
 
@@ -9,7 +10,7 @@ export default function MyDtr() {
   const today = useManilaDate();
   const [month, setMonth] = useState(today.slice(0, 7));
   // Only months the server accepts: an "Invalid month" thrown from useQuery would blank the app.
-  const valid = /^\d{4}-(0[1-9]|1[0-2])$/.test(month);
+  const valid = isMonth(month);
   const dtr = useQuery(api.self.monthly, valid ? { month, today } : "skip");
 
   return (

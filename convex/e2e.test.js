@@ -18,6 +18,12 @@ async function seed() {
       await ctx.db.insert("attendance", { userId, date: "2026-11-02", timeIn: 1 });
       const sessionId = await ctx.db.insert("authSessions", { userId, expirationTime: 9e15 });
       await ctx.db.insert("authRefreshTokens", { sessionId, expirationTime: 9e15 });
+      // Failed sign-ins leave a rate-limit row keyed by the account id.
+      const account = await ctx.db
+        .query("authAccounts")
+        .withIndex("userIdAndProvider", (q) => q.eq("userId", userId))
+        .first();
+      await ctx.db.insert("authRateLimits", { identifier: account._id, lastAttemptTime: 1, attemptsLeft: 3 });
     }
     await ctx.db.insert("holidays", { date: "2026-11-04", name: "E2E-Holiday" });
     await ctx.db.insert("holidays", { date: "2026-12-25", name: "Christmas" });
@@ -48,8 +54,9 @@ test("purge deletes only E2E- employees and everything tied to them", async () =
   process.env.E2E_PURGE_ALLOWED = "true";
   const { t, testId, realId } = await seed();
   expect(await t.mutation(internal.e2e.purge, { prefix: "E2E-" })).toEqual({
-    users: 1, attendance: 1, accounts: 1, sessions: 1, refreshTokens: 1, holidays: 1,
+    users: 1, attendance: 1, accounts: 1, rateLimits: 1, sessions: 1, refreshTokens: 1, holidays: 1,
   });
+  expect(await count(t, "authRateLimits")).toBe(1); // E001's stays
   await t.run(async (ctx) => {
     expect(await ctx.db.get(testId)).toBeNull();
     expect(await ctx.db.get(realId)).not.toBeNull();

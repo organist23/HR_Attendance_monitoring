@@ -14,6 +14,9 @@ export function isWorkday(weekday) {
   return weekday >= 1 && weekday <= 5;
 }
 
+// "YYYY-MM". Shared by the server's month builder and the web app's month guard.
+export const isMonth = (month) => /^\d{4}-(0[1-9]|1[0-2])$/.test(month);
+
 // Round-trip through Date rejects impossible dates like 2026-02-30.
 export function isRealDate(date) {
   const ms = Date.parse(`${date}T00:00:00Z`);

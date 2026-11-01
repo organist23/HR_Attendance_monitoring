@@ -90,6 +90,13 @@ test.describe("US-7 Employee logs in", () => {
     await expect(page.getByRole("heading", { name: "Change your password" })).toBeVisible();
   });
 
+  test("lockout after 10 wrong passwords says so, even for the right one", async ({ page }) => {
+    const { employeeId } = await newEmployee();
+    for (let i = 0; i < 10; i++) await expect(clientAs(employeeId, "wrong-pass-9")).rejects.toThrow();
+    await login(page, employeeId, TEMP);
+    await expect(page.getByRole("alert")).toHaveText("Too many attempts. Try again later.");
+  });
+
   test("HR admin can't use the employee app", async ({ page }) => {
     await login(page, E2E_ADMIN_USER, E2E_ADMIN_PASS);
     await expect(page.getByRole("alert")).toHaveText("This account can't use the employee app.");
