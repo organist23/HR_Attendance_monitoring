@@ -114,6 +114,38 @@ export async function monthFor(ctx, user, month, today) {
   return { employeeId: user.employeeId, name: user.name, days, totals };
 }
 
+// A leading = + - @ tab or CR would run as a spreadsheet formula, so it gets a ' prefix.
+const cell = (text) => {
+  const safe = /^[=+\-@\t\r]/.test(text) ? `'${text}` : text;
+  return /[",\r\n]/.test(safe) ? `"${safe.replaceAll('"', '""')}"` : safe;
+};
+
+// US-10. Every employee's monthly totals as CSV. Inactive ones only with a punch or a counted day
+// (absences before deactivation) that month.
+export const monthlyCsv = query({
+  args: { month: v.string(), today: v.string() },
+  handler: async (ctx, { month, today }) => {
+    await requireAdmin(ctx);
+    if (!isMonth(month)) throw new ConvexError("Invalid month");
+    const employees = await ctx.db
+      .query("users")
+      .withIndex("by_employeeId")
+      .filter((q) => q.eq(q.field("role"), "employee"))
+      .collect();
+    // shortcut: one query reads every employee's month (~7k docs at 300 staff); paginate if staff passes ~1,000.
+    const lines = [];
+    for (const user of employees) {
+      const { days, totals: t } = await monthFor(ctx, user, month, today);
+      if (!user.active && !t.required && !days.some((d) => d.timeIn !== undefined)) continue;
+      lines.push(
+        [cell(user.employeeId), cell(user.name), t.rendered, t.required, t.missing, t.late, t.undertime, t.absences].join(","),
+      );
+    }
+    const header = "Employee ID,Name,Rendered (min),Required (min),Missing (min),Late (min),Undertime (min),Absences";
+    return { count: lines.length, csv: [header, ...lines].map((l) => `${l}\r\n`).join("") };
+  },
+});
+
 // US-6. Times are Manila "HH:MM" on `date`; only the fields given are changed.
 export const correct = mutation({
   args: {
