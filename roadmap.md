@@ -63,13 +63,32 @@ Conventions later phases inherit:
 
 Deliberately not built, and why: corrections (Phase 2 owns it), employee web app (Phase 3 owns it), reports (Phase 4 owns it).
 
-### Phase 2 — Corrections NEXT
+### Phase 2 — Corrections ✅ DONE (merged `33d24bd`, 2026-11-01)
 
 Covers US-6.
 
 - HR edits time-in or time-out with a required reason, and the correction history shows on the record
 
-### Phase 3 — Employee web app LATER
+**Verified** on 2026-11-01. Backend `npm test` 84/84. Playwright over Electron ran in a throwaway Convex project under the `e2e-testing` skill: 21 pass and 4 skipped. All 5 US-6 tests run on any day because they seed a past punch. The 4 skipped tests are the Phase 0/1 weekday-only punch tests and still need a weekday run. Results: `PHASE-2-TEST-RESULTS.md`.
+
+Shipped as:
+- `convex/attendance.js`: `correct({ employeeId, date, timeIn?, timeOut?, reason })` with Manila `"HH:MM"` times. `monthly` days add `corrections`.
+- Schema: attendance rows add `corrections: [{ field, from?, to, reason, at }]`, oldest first.
+- `convex/lib/manila.js`: adds `isRealDate`, which `holidays.add` also uses.
+- `convex/e2e.js`: adds internal `seedPunch`, gated like `purge`.
+- `hr/DTR.jsx`: an Edit button per day with a time-in or Absent status opens the form and history. Corrected days show "· Corrected".
+
+Decisions made with the user: a correction can create a record on an Absent day. New records are allowed only on non-holiday weekdays.
+
+Conventions later phases inherit:
+- Attendance times change only through `punch` or `correct`, and every `correct` change appends to `corrections`.
+- A change within the same minute as the stored value is not a change.
+- `monthly` returns each day's `corrections`, including reasons. Phase 3 decides whether employees see them.
+- E2E tests that need past punches use `e2e:seedPunch` with `E2E_DEPLOYMENT` from `.env.e2e`.
+
+Deliberately not built, and why: removing a punch (US-6 asks only to edit or add), recording which admin made a change (there is one shared admin account).
+
+### Phase 3 — Employee web app NEXT
 
 Covers US-7, US-8.
 
