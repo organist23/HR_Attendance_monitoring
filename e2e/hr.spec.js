@@ -283,7 +283,7 @@ test.describe("US-4 Monthly DTR", () => {
 // US-6. The UI only punches today, so each test seeds a past Friday through e2e:seedPunch
 // (gated like purge) and runs on any day of the week.
 const SEED_DATE = "2026-10-30";
-const atManila = (hhmm) => Date.parse(`${SEED_DATE}T${hhmm}:00+08:00`);
+const atManila = (time) => Date.parse(`${SEED_DATE}T${time.padEnd(8, ":00")}+08:00`); // "HH:MM" or "HH:MM:SS"
 
 function seedPunch(employeeId, timeIn, timeOut) {
   const deployment = process.env.E2E_DEPLOYMENT;
@@ -302,11 +302,11 @@ test.describe("US-6 Corrections", () => {
   const day = () => page.getByRole("row").filter({ hasText: SEED_DATE });
   const cell = (n) => day().getByRole("cell").nth(n); // 4 rendered, 5 late, 7 missing
 
-  async function seededDtr() {
+  async function seededDtr(timeIn = "08:00") {
     const id = newId();
     await createEmployee(id);
     await expect(rowFor(id)).toBeVisible();
-    seedPunch(id, "08:00");
+    seedPunch(id, timeIn);
     await viewDtr(id, SEED_DATE.slice(0, 7));
     await expect(day()).toContainText("Incomplete");
   }
@@ -340,6 +340,15 @@ test.describe("US-6 Corrections", () => {
     await day().getByRole("button", { name: "Edit" }).click();
     await expect(page.getByText(/^Time out: — → 17:00 · E2E forgot out · /)).toBeVisible();
     await expect(page.getByText(/^Time in: 08:00 → 08:20 · E2E late · /)).toBeVisible();
+  });
+
+  test("untouched time-in with seconds is not logged as a change", async () => {
+    await seededDtr("08:00:45"); // real punches carry seconds; the input shows 08:00
+    await submitCorrection({ timeOut: "17:00", reason: "E2E out only" });
+    await expect(day()).toContainText("Present · Corrected");
+    await day().getByRole("button", { name: "Edit" }).click();
+    await expect(page.getByRole("listitem")).toHaveCount(1);
+    await expect(page.getByRole("listitem")).toHaveText(/^Time out: — → 17:00 · E2E out only · /);
   });
 
   test("blank reason shows error and changes nothing", async () => {

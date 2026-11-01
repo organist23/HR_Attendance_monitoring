@@ -1,7 +1,7 @@
 import { useMutation, useQuery } from "convex/react";
 import { Fragment, useEffect, useRef, useState } from "react";
 import { api } from "../convex/_generated/api";
-import { manilaDay } from "../convex/lib/manila";
+import { manilaDay, manilaMinutes } from "../convex/lib/manila";
 import { errorText } from "./errors";
 import { manilaTime, useManilaDate } from "./Punch";
 
@@ -16,7 +16,9 @@ function duration(min) {
   return [h && `${h}h`, m && `${m}m`].filter(Boolean).join(" ");
 }
 
-const hhmm = (ms) => (ms === undefined ? "" : manilaTime(ms));
+// <input type="time"> value. Built from minutes, not the locale, so midnight is never "24:00".
+const pad = (n) => String(n).padStart(2, "0");
+const hhmm = (ms) => (ms === undefined ? "" : `${pad(Math.floor(manilaMinutes(ms) / 60))}:${pad(manilaMinutes(ms) % 60)}`);
 
 // US-6: history plus the edit form for one day, shown under its row.
 function Correction({ employeeId, day, onClose }) {
@@ -41,14 +43,8 @@ function Correction({ employeeId, day, onClose }) {
     setPending(true);
     setError("");
     try {
-      // Send only what the user changed: stored punches have seconds, the inputs only minutes.
-      await correct({
-        employeeId,
-        date: day.date,
-        reason,
-        ...(timeIn !== hhmm(day.timeIn) && { timeIn }),
-        ...(timeOut !== hhmm(day.timeOut) && { timeOut }),
-      });
+      // The server skips fields in the same minute as the stored value, so send both.
+      await correct({ employeeId, date: day.date, reason, timeIn: timeIn || undefined, timeOut: timeOut || undefined });
       onClose();
     } catch (err) {
       setError(errorText(err));
@@ -69,7 +65,7 @@ function Correction({ employeeId, day, onClose }) {
             ))}
           </ul>
         )}
-        <form onSubmit={submit} onKeyDown={(e) => e.key === "Escape" && onClose()} className="row">
+        <form onSubmit={submit} onKeyDown={(e) => e.key === "Escape" && !pending && onClose()} className="row">
           <label>
             Time in
             <input ref={first} type="time" value={timeIn} onChange={(e) => setTimeIn(e.target.value)} disabled={pending} />
