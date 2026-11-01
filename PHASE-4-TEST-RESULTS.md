@@ -21,7 +21,7 @@ Pass run under `.claude/skills/e2e-testing` (feature-workflow step 8).
   - All passed again after the code was restored.
 - **Real bug the E2E found:** the US-10 test seeded a punch before the create action finished (a test race). Fixed by waiting for the row.
 - **Purge:** 118 users, 39 sessions, plus their accounts and punches. A second purge returned 0 for every table.
-- **Left behind:** the Convex project `hr-e2e-p4`, which the developer deletes in the dashboard.
+- **Left behind:** nothing. The developer deleted the Convex project `hr-e2e-p4` in the dashboard on 2026-11-01.
 
 ## US-9 HR prints an employee DTR
 
