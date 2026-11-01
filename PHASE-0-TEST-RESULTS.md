@@ -62,7 +62,7 @@ The code-review fixes were the temporary password floor, the trimmed sign-in use
 - **Backend:** `npm test` 36/36.
 - **E2E:** 12 pass, 3 skipped (the same workday-only tests), 0 fail, exit 0. Per-test results match the tables above.
 - **Teardown:** purge removed users 7, accounts 7, attendance 0, sessions 0, refresh tokens 0. `.env.local` was restored to dev, `.env.e2e` removed, and `dist/hr` rebuilt and checked against dev.
-- **Left behind:** the Convex project `hr-e2e-phase0b`, until the developer deletes it in the dashboard.
+- **Left behind:** nothing. The developer deleted the Convex project `hr-e2e-phase0b` in the dashboard (2026-11-01).
 
 ## Open
 - On a weekday (Manila), run a new pass under the e2e-testing skill to execute the 3 skipped workday tests.
