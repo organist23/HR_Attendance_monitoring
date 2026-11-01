@@ -21,10 +21,9 @@ test.beforeEach(async () => {
 });
 
 test.afterEach(async () => {
-  // app.close() occasionally hangs on Windows; kill the process as a fallback.
-  const proc = app.process();
-  await Promise.race([app.close(), new Promise((r) => setTimeout(r, 5000))]);
-  proc.kill();
+  // app.close() occasionally hangs on Windows; exit the app hard so Playwright sees the process end.
+  await app.evaluate(({ app: electronApp }) => electronApp.exit(0)).catch(() => {});
+  await app.close().catch(() => {});
 });
 
 async function login(user = USER, pass = PASS) {
