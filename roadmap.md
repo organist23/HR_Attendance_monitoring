@@ -34,7 +34,7 @@ Conventions later phases inherit:
 - Backend tests use `convex-test` with `test/convexHelpers.js`.
 - E2E passes follow `.claude/skills/e2e-testing`, using a throwaway project and `E2E-` IDs, then purge.
 
-### Phase 1 — DTR computation and holidays NEXT
+### Phase 1 — DTR computation and holidays ✅ DONE (merged `7024b53`, 2026-11-01)
 
 Covers US-4, US-5.
 
@@ -42,11 +42,28 @@ Covers US-4, US-5.
 - HR views any employee's monthly DTR with totals
 - HR adds and removes holidays
 
-**Done when:** the US-4 example days produce the exact values in the spec, and a holiday drops out of required hours and absences.
+**Done when:** the US-4 example days produce the exact values in the spec, and a holiday drops out of required hours and absences. — **Verified** on 2026-11-01. Backend `npm test` 65/65, with all US-4 example days as hand-derived cases. Playwright over Electron ran in throwaway Convex projects under the `e2e-testing` skill: 17 pass and 4 skipped. The 4 skipped tests (3 Phase 0 punch tests and the US-4 Incomplete test) only run on weekdays and still need one. Results: `PHASE-1-TEST-RESULTS.md`.
+
+Shipped as:
+- `convex/lib/dtr.js`: `computeDay({ timeIn, timeOut })`, all values in minutes.
+- `convex/lib/manila.js`: adds `manilaMinutes`.
+- `convex/holidays.js`: `list`, `add`, `remove`. Schema adds the `holidays` table.
+- `convex/attendance.js`: `monthly({ employeeId, month, today })`, and `punch` rejects holidays.
+- `convex/employees.js`: `setActive` stores `deactivatedOn`.
+- `hr/` adds the `DTR` and `Holidays` tabs.
+
+Picked up from Phase 0: the punch flow now rejects holidays (US-3).
+
+Decisions made with the user: an on-time time-in with an early time-out (e.g. 8:00–16:00) is Present, with undertime shown. The Punch tab's Today list keeps "Timed in" and "Timed out".
+
+Conventions later phases inherit:
+- Every DTR number comes from `computeDay`, and every month comes from `attendance.monthly`. Phases 3 and 4 reuse them rather than recompute.
+- A day counts toward required hours only if it is a non-holiday weekday and either has a time-in, or is after the creation day, before today, and before `deactivatedOn`.
+- Queries that depend on "today" take the Manila date from the client.
 
 Deliberately not built, and why: corrections (Phase 2 owns it), employee web app (Phase 3 owns it), reports (Phase 4 owns it).
 
-### Phase 2 — Corrections LATER
+### Phase 2 — Corrections NEXT
 
 Covers US-6.
 
