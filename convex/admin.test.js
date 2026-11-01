@@ -67,3 +67,24 @@ test("sign-in ignores spaces around the username", async () => {
   });
   expect(result.tokens?.token).toBeTruthy();
 });
+
+test("resetPassword: old password fails, new one signs in", async () => {
+  const { exportPKCS8, generateKeyPair } = await import("jose");
+  const { privateKey } = await generateKeyPair("RS256", { extractable: true });
+  process.env.JWT_PRIVATE_KEY = await exportPKCS8(privateKey);
+  process.env.CONVEX_SITE_URL = "https://test.convex.site";
+  const t = convexTest(schema, modules);
+  await t.action(internal.admin.create, { username: "boss", password: "admin-pass-1" });
+  await t.action(internal.admin.resetPassword, { username: "boss", password: "admin-pass-2" });
+  const signIn = (password) =>
+    t.action(api.auth.signIn, { provider: "password", params: { flow: "signIn", username: "boss", password } });
+  await expect(signIn("admin-pass-1")).rejects.toThrow();
+  expect((await signIn("admin-pass-2")).tokens?.token).toBeTruthy();
+});
+
+test("resetPassword: unknown username rejects", async () => {
+  const t = convexTest(schema, modules);
+  await expect(
+    t.action(internal.admin.resetPassword, { username: "nobody", password: "admin-pass-2" }),
+  ).rejects.toThrow();
+});

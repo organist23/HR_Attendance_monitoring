@@ -1,4 +1,4 @@
-import { createAccount, getAuthUserId } from "@convex-dev/auth/server";
+import { createAccount, getAuthUserId, modifyAccountCredentials } from "@convex-dev/auth/server";
 import { ConvexError, v } from "convex/values";
 import { internal } from "./_generated/api";
 import { internalAction, internalQuery, query } from "./_generated/server";
@@ -28,6 +28,14 @@ export const create = internalAction({
       profile: { name: "HR Admin", role: "admin" },
     });
     return user._id;
+  },
+});
+
+// CLI only, for a forgotten password: npx convex run admin:resetPassword '{"username":"...","password":"..."}'
+export const resetPassword = internalAction({
+  args: { username: v.string(), password: v.string() },
+  handler: async (ctx, { username, password }) => {
+    await modifyAccountCredentials(ctx, { provider: "password", account: { id: username, secret: password } });
   },
 });
 
