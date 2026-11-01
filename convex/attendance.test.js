@@ -120,3 +120,110 @@ test("today skips a row whose employee was deleted", async () => {
   });
   expect((await today()).map((r) => r.employeeId)).toEqual(["E001"]);
 });
+
+test("punch on a holiday rejected, no row", async () => {
+  const { t, punch, rows } = await setup();
+  await t.run((ctx) => ctx.db.insert("holidays", { date: "2026-11-02", name: "Test Day" }));
+  at(MON_0805);
+  await expect(punch()).rejects.toThrow("Not a workday");
+  expect(await rows()).toHaveLength(0);
+});
+
+// Monthly DTR. Employee created Nov 1 Manila unless noted; month 2026-11, today Nov 6 (Fri).
+const NOV1 = "2026-10-31T16:00:00Z";
+const manila = (date, hhmm) => Date.parse(`${date}T${hhmm}:00+08:00`);
+
+async function monthSetup({ createdAt = NOV1, active = true } = {}) {
+  const t = convexTest(schema, modules);
+  const { as } = await asRole(t, "admin", { email: "admin" });
+  at(createdAt);
+  const userId = await t.run((ctx) =>
+    ctx.db.insert("users", { role: "employee", employeeId: "E001", name: "Juan Dela Cruz", active }),
+  );
+  const punched = (date, inAt, outAt) =>
+    t.run((ctx) =>
+      ctx.db.insert("attendance", {
+        userId, date, timeIn: manila(date, inAt), ...(outAt && { timeOut: manila(date, outAt) }),
+      }),
+    );
+  const holiday = (date, name = "Holiday") => t.run((ctx) => ctx.db.insert("holidays", { date, name }));
+  const monthly = (args = {}) =>
+    as.query(api.attendance.monthly, { employeeId: "E001", month: "2026-11", today: "2026-11-06", ...args });
+  return { t, punched, holiday, monthly };
+}
+
+const byDate = (dtr) => Object.fromEntries(dtr.days.map((d) => [d.date, d]));
+const pick = (d) => [d.rendered, d.late, d.undertime, d.missing, d.status];
+
+test("monthly: daily rows and totals", async () => {
+  const { punched, monthly } = await monthSetup();
+  await punched("2026-11-02", "08:20", "17:00");
+  await punched("2026-11-03", "08:00", "16:00");
+  const dtr = await monthly();
+  expect([dtr.employeeId, dtr.name, dtr.days.length]).toEqual(["E001", "Juan Dela Cruz", 30]);
+  const d = byDate(dtr);
+  expect(pick(d["2026-11-02"])).toEqual([460, 20, 0, 20, "Late"]);
+  expect(d["2026-11-02"].timeIn).toBe(manila("2026-11-02", "08:20"));
+  expect(pick(d["2026-11-03"])).toEqual([420, 0, 60, 60, "Present"]);
+  expect(pick(d["2026-11-04"])).toEqual([0, 0, 0, 480, "Absent"]);
+  expect(pick(d["2026-11-05"])).toEqual([0, 0, 0, 480, "Absent"]);
+  expect(pick(d["2026-11-06"])).toEqual([0, 0, 0, 0, ""]); // today, no punch yet
+  expect(pick(d["2026-11-07"])).toEqual([0, 0, 0, 0, ""]); // Saturday
+  expect(d["2026-11-07"].weekday).toBe(6);
+  expect(pick(d["2026-11-09"])).toEqual([0, 0, 0, 0, ""]); // future
+  expect(dtr.totals).toEqual({ rendered: 880, required: 1920, missing: 1040, late: 20, undertime: 60, absences: 2 });
+});
+
+test("monthly: holiday is not absent and adds no required hours", async () => {
+  const { punched, holiday, monthly } = await monthSetup();
+  await punched("2026-11-02", "08:20", "17:00");
+  await punched("2026-11-03", "08:00", "16:00");
+  await holiday("2026-11-04", "Founding Day");
+  const dtr = await monthly();
+  const d = byDate(dtr);
+  expect([d["2026-11-04"].holiday, d["2026-11-04"].status]).toEqual(["Founding Day", ""]);
+  expect([dtr.totals.required, dtr.totals.absences]).toEqual([1440, 1]);
+});
+
+test("monthly: holiday added after a punch keeps times but is not counted", async () => {
+  const { punched, holiday, monthly } = await monthSetup();
+  await punched("2026-11-02", "08:00", "17:00");
+  await holiday("2026-11-02");
+  const d = byDate(await monthly({ today: "2026-11-03" }));
+  expect(d["2026-11-02"].timeIn).toBe(manila("2026-11-02", "08:00"));
+  expect(d["2026-11-02"].timeOut).toBe(manila("2026-11-02", "17:00"));
+  expect(pick(d["2026-11-02"])).toEqual([0, 0, 0, 0, ""]);
+  expect((await monthly({ today: "2026-11-03" })).totals.required).toBe(0);
+});
+
+test("monthly: no absences before the employee was created", async () => {
+  const { monthly } = await monthSetup({ createdAt: "2026-11-04T01:00:00Z" });
+  const dtr = await monthly();
+  const d = byDate(dtr);
+  expect([d["2026-11-02"].status, d["2026-11-03"].status, d["2026-11-04"].status]).toEqual(["", "", "Absent"]);
+  expect(dtr.totals.absences).toBe(2); // Nov 4 and Nov 5
+});
+
+test("monthly: inactive employee has no absences", async () => {
+  const { monthly } = await monthSetup({ active: false });
+  expect((await monthly()).totals).toEqual({ rendered: 0, required: 0, missing: 0, late: 0, undertime: 0, absences: 0 });
+});
+
+test("monthly: unknown employee returns null, admin username too", async () => {
+  const { monthly } = await monthSetup();
+  expect(await monthly({ employeeId: "E999" })).toBeNull();
+  expect(await monthly({ employeeId: "admin" })).toBeNull();
+});
+
+test("monthly: invalid month rejected", async () => {
+  const { monthly } = await monthSetup();
+  await expect(monthly({ month: "2026-13" })).rejects.toThrow("Invalid month");
+});
+
+test("monthly: non-admin rejected", async () => {
+  const t = convexTest(schema, modules);
+  const { as } = await asRole(t, "employee", { employeeId: "E002", active: true });
+  await expect(
+    as.query(api.attendance.monthly, { employeeId: "E002", month: "2026-11", today: "2026-11-06" }),
+  ).rejects.toThrow("Not authorized");
+});

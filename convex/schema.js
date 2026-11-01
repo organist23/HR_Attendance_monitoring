@@ -30,4 +30,5 @@ export default defineSchema({
   })
     .index("by_user_date", ["userId", "date"])
     .index("by_date", ["date"]),
+  holidays: defineTable({ date: v.string(), name: v.string() }).index("by_date", ["date"]),
 });
