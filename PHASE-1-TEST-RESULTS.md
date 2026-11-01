@@ -10,9 +10,10 @@ Pass run under `.claude/skills/e2e-testing` (feature-workflow step 8).
   - the deployment held exactly one user, the admin
   - `admin:isAdmin` returned `false` for an anonymous caller
   - `E2E_PURGE_ALLOWED` was set on the test deployment
-- **Backend:** `npm test` (Vitest + convex-test). 63/63 pass.
+- **Backend:** `npm test` (Vitest + convex-test). 65/65 pass after the review fix pass.
 - **E2E driver:** Playwright over Electron (`npm run e2e`). 17 pass, 4 skipped, 0 fail, exit 0.
 - **Mutation check:** with five UI behaviors broken on purpose (holiday name hidden in the DTR, not-found text changed, Absences total hidden, Remove a no-op, add error swallowed), all 5 runnable new scenarios failed. They passed again after the code was restored.
+- **Re-verify after the review fix pass** (absences stop at deactivation, and the creation day is no longer Absent): fresh throwaway project `hr-e2e-phase1b`, deployment `jovial-goose-577`. The same 4 isolation checks passed. 17 pass, 4 skipped, 0 fail, exit 0. Purge: `{"users":9,"accounts":9,"attendance":0,"holidays":1,"sessions":0,"refreshTokens":0}`, after which only the admin was left.
 - **Re-run finding, fixed in the tests:** a second run before purge failed because the holiday tests reused fixed dates. Those tests now use unique far-future dates, and the DTR holiday test removes its own holiday. Two back-to-back runs then passed.
 
 Exact US-4 values (rendered, late, undertime, missing per day, and monthly totals) need controlled punch times. Server time can't be set in E2E, so the backend tests prove them with hand-derived values: `convex/lib/dtr.test.js` has 13 cases and `convex/attendance.test.js` covers the month.
@@ -54,4 +55,4 @@ Phase 0 E2E tests: all still pass, and the 3 workday-only tests were SKIPPED (we
 
 - Purge counts on the final run: `{"users":13,"accounts":13,"attendance":0,"holidays":3,"sessions":0,"refreshTokens":0}`. Earlier runs were purged too. Afterwards the deployment held only the admin, and the holidays and attendance tables were empty.
 - `.env.local` restored to `woozy-nightingale-996`, `.env.e2e` deleted, `dist/hr` rebuilt and confirmed to point at dev.
-- **Left behind:** the Convex project `hr-e2e-phase1`. The developer deletes it from the dashboard.
+- **Left behind:** the Convex projects `hr-e2e-phase1` and `hr-e2e-phase1b`. The developer deletes them from the dashboard.
