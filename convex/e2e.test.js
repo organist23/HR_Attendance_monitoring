@@ -19,6 +19,8 @@ async function seed() {
       const sessionId = await ctx.db.insert("authSessions", { userId, expirationTime: 9e15 });
       await ctx.db.insert("authRefreshTokens", { sessionId, expirationTime: 9e15 });
     }
+    await ctx.db.insert("holidays", { date: "2026-11-04", name: "E2E-Holiday" });
+    await ctx.db.insert("holidays", { date: "2026-12-25", name: "Christmas" });
   });
   return { t, testId, realId };
 }
@@ -46,7 +48,7 @@ test("purge deletes only E2E- employees and everything tied to them", async () =
   process.env.E2E_PURGE_ALLOWED = "true";
   const { t, testId, realId } = await seed();
   expect(await t.mutation(internal.e2e.purge, { prefix: "E2E-" })).toEqual({
-    users: 1, attendance: 1, accounts: 1, sessions: 1, refreshTokens: 1,
+    users: 1, attendance: 1, accounts: 1, sessions: 1, refreshTokens: 1, holidays: 1,
   });
   await t.run(async (ctx) => {
     expect(await ctx.db.get(testId)).toBeNull();
@@ -58,4 +60,6 @@ test("purge deletes only E2E- employees and everything tied to them", async () =
   });
   expect([await count(t, "authSessions"), await count(t, "authRefreshTokens")]).toEqual([1, 1]);
   expect(await count(t, "users")).toBe(2); // admin + E001
+  const holidays = await t.run((ctx) => ctx.db.query("holidays").collect());
+  expect(holidays.map((h) => h.name)).toEqual(["Christmas"]);
 });

@@ -9,7 +9,7 @@ export const purge = internalMutation({
     if (process.env.E2E_PURGE_ALLOWED !== "true") throw new Error("E2E purge disabled on this deployment");
     if (!prefix.startsWith("E2E-")) throw new Error("Prefix must start with E2E-");
 
-    const counts = { users: 0, attendance: 0, accounts: 0, sessions: 0, refreshTokens: 0 };
+    const counts = { users: 0, attendance: 0, accounts: 0, sessions: 0, refreshTokens: 0, holidays: 0 };
     const users = await ctx.db
       .query("users")
       .withIndex("by_employeeId", (q) => q.gte("employeeId", prefix).lt("employeeId", `${prefix}￿`))
@@ -40,6 +40,11 @@ export const purge = internalMutation({
       await del(sessions, "sessions");
       await ctx.db.delete(user._id);
       counts.users += 1;
+    }
+    for (const holiday of await ctx.db.query("holidays").collect()) {
+      if (!holiday.name.startsWith(prefix)) continue;
+      await ctx.db.delete(holiday._id);
+      counts.holidays += 1;
     }
     return counts;
   },
