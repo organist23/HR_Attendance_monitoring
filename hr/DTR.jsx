@@ -16,6 +16,50 @@ function duration(min) {
   return [h && `${h}h`, m && `${m}m`].filter(Boolean).join(" ");
 }
 
+// DTR table pieces shared with the employee web app (web/MyDtr.jsx).
+export function DayHeaders() {
+  return ["Date", "Day", "Time in", "Time out", "Rendered", "Late", "Undertime", "Missing", "Status"].map((h) => (
+    <th key={h}>{h}</th>
+  ));
+}
+
+// `corrections` is absent in the employee's DTR.
+export function DayCells({ d }) {
+  return (
+    <>
+      <td>{d.date}</td>
+      <td>{DAYS[d.weekday]}</td>
+      <td>{d.timeIn === undefined ? "—" : manilaTime(d.timeIn)}</td>
+      <td>{d.timeOut === undefined ? "—" : manilaTime(d.timeOut)}</td>
+      <td>{duration(d.rendered)}</td>
+      <td>{duration(d.late)}</td>
+      <td>{duration(d.undertime)}</td>
+      <td>{duration(d.missing)}</td>
+      <td>
+        {d.holiday ?? d.status}
+        {d.corrections?.length > 0 && " · Corrected"}
+      </td>
+    </>
+  );
+}
+
+export function TotalCells({ totals, lastSpan = 1 }) {
+  return (
+    <>
+      <th colSpan={4} scope="row">
+        Totals
+      </th>
+      <td>{duration(totals.rendered)}</td>
+      <td>{duration(totals.late)}</td>
+      <td>{duration(totals.undertime)}</td>
+      <td>{duration(totals.missing)}</td>
+      <td colSpan={lastSpan}>
+        Required {duration(totals.required)} · Absences {totals.absences}
+      </td>
+    </>
+  );
+}
+
 // <input type="time"> value. Built from minutes, not the locale, so midnight is never "24:00".
 const pad = (n) => String(n).padStart(2, "0");
 const hhmm = (ms) => (ms === undefined ? "" : `${pad(Math.floor(manilaMinutes(ms) / 60))}:${pad(manilaMinutes(ms) % 60)}`);
@@ -144,15 +188,7 @@ export default function DTR() {
           <table>
             <thead>
               <tr>
-                <th>Date</th>
-                <th>Day</th>
-                <th>Time in</th>
-                <th>Time out</th>
-                <th>Rendered</th>
-                <th>Late</th>
-                <th>Undertime</th>
-                <th>Missing</th>
-                <th>Status</th>
+                <DayHeaders />
                 <th>
                   <span className="sr-only">Actions</span>
                 </th>
@@ -162,18 +198,7 @@ export default function DTR() {
               {dtr.days.map((d) => (
                 <Fragment key={d.date}>
                   <tr>
-                    <td>{d.date}</td>
-                    <td>{DAYS[d.weekday]}</td>
-                    <td>{d.timeIn === undefined ? "—" : manilaTime(d.timeIn)}</td>
-                    <td>{d.timeOut === undefined ? "—" : manilaTime(d.timeOut)}</td>
-                    <td>{duration(d.rendered)}</td>
-                    <td>{duration(d.late)}</td>
-                    <td>{duration(d.undertime)}</td>
-                    <td>{duration(d.missing)}</td>
-                    <td>
-                      {d.holiday ?? d.status}
-                      {d.corrections.length > 0 && " · Corrected"}
-                    </td>
+                    <DayCells d={d} />
                     <td>
                       {(d.timeIn !== undefined || d.status === "Absent") && (
                         <button
@@ -193,16 +218,7 @@ export default function DTR() {
             </tbody>
             <tfoot>
               <tr>
-                <th colSpan={4} scope="row">
-                  Totals
-                </th>
-                <td>{duration(dtr.totals.rendered)}</td>
-                <td>{duration(dtr.totals.late)}</td>
-                <td>{duration(dtr.totals.undertime)}</td>
-                <td>{duration(dtr.totals.missing)}</td>
-                <td colSpan={2}>
-                  Required {duration(dtr.totals.required)} · Absences {dtr.totals.absences}
-                </td>
+                <TotalCells totals={dtr.totals} lastSpan={2} />
               </tr>
             </tfoot>
           </table>
