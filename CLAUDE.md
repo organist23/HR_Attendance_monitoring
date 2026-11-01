@@ -42,9 +42,10 @@ In addition to clearly communicating, it's important that we clearly communicate
 
 ## 3. Project facts
 
-Fill in per project. `feature-workflow` reads these.
+`feature-workflow` reads these.
 
-- Trust boundaries (step 10 runs `/security-review` when a diff touches these): <auth, payments, file upload, ...>
-- UI test driver (step 8, only if not `claude-in-chrome`): <Playwright / Cypress / none>
-- Test command: <npm test / pytest / ...>
+- Stack: React + Electron (HR desktop app), React (employee web app), Convex (backend, database, auth), JavaScript.
+- Trust boundaries (step 10 runs `/security-review` when a diff touches these): HR admin auth and the admin check on every HR Convex function (US-1), employee auth and password change (US-7), employee access limited to their own records (US-8), attendance corrections and their log (US-6).
+- UI test driver (step 8, only if not `claude-in-chrome`): Playwright, for both the Electron HR app and the React employee web app.
+- Test command: `npm test` (Vitest, backend). UI E2E: `npm run build && npm run e2e` (Playwright, Electron).
 

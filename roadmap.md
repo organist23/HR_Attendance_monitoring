@@ -1,45 +1,47 @@
 # Roadmap
 
-## Part one — <goal of this group of phases>
+## Part one — HR attendance recording and DTR
 
-### Phase 0 — <Name> ✅ DONE (merged `abc1234`, 2026-01-01)
+### Phase 0 — Record punches NEXT
 
-<One sentence: why this phase comes here.>
-Covers US-<N>, US-<N>.
+Proves the core loop: Electron + React app → Convex → punch saved and shown live.
+Covers US-1, US-2, US-3.
 
-- <User-visible outcome>
-- <User-visible outcome>
+- HR logs in with the shared admin account
+- HR creates, searches, and deactivates employees
+- Entering an employee ID saves time-in, then time-out, at server time
+- Today's list shows each punched employee
 
-**Done when:** <checkable condition>. — **Verified** on <date> with <driver from `feature-workflow` step 8>, <what was checked>. Results: `PHASE-<N>-TEST-RESULTS.md`.
+**Done when:** the admin logs in, creates an employee, and two punches by employee ID show time-in and time-out in today's list. Unknown, inactive, third-punch, and non-workday punches are rejected.
 
-Shipped as `<file>`: <functions>.
+Deliberately not built, and why: lateness, undertime, and hours computation (Phase 1 owns it). Phase 0 only checks Saturdays and Sundays as non-workdays, and holiday management is also Phase 1. Corrections (Phase 2 owns it). Employee web app (Phase 3 owns it). Reports (Phase 4 owns it).
 
-Deliberately not built, and why: <thing>, because <later phase owns it>.
+### Phase 1 — DTR computation and holidays LATER
 
-Picked up from phase N: <anything carried over>.
+Covers US-4, US-5.
 
-Conventions later phases inherit: <rule>.
+- Daily rendered, late, undertime, missing, and status per the spec's computation rules
+- HR views any employee's monthly DTR with totals
+- HR adds and removes holidays
 
-### Phase 1 — <Name> NEXT
+**Done when:** the US-4 example days produce the exact values in the spec, and a holiday drops out of required hours and absences.
 
-<One sentence: why this phase comes here.>
-Covers US-<N>, US-<N>.
+Deliberately not built, and why: corrections (Phase 2 owns it), employee web app (Phase 3 owns it), reports (Phase 4 owns it).
 
-- <User-visible outcome>
-- <User-visible outcome>
+### Phase 2 — Corrections LATER
 
-**Done when:** <checkable condition>.
+Covers US-6.
 
-Deliberately not built, and why: <thing>, because <later phase owns it>.
+- HR edits time-in or time-out with a required reason, and the correction history shows on the record
 
-### Phase 2 — <Name> LATER
+### Phase 3 — Employee web app LATER
 
-Covers US-<N>.
+Covers US-7, US-8.
 
-- <One outcome>
+- Employees log in by ID and password and view their own monthly DTR, read-only
 
-### Phase 3 — <Name> LATER
+### Phase 4 — Reports LATER
 
-Covers US-<N>.
+Covers US-9, US-10.
 
-- <One outcome>
+- Printable per-employee DTR and a monthly CSV of all employees
