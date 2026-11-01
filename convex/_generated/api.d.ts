@@ -11,6 +11,7 @@
 import type * as admin from "../admin.js";
 import type * as attendance from "../attendance.js";
 import type * as auth from "../auth.js";
+import type * as e2e from "../e2e.js";
 import type * as employees from "../employees.js";
 import type * as http from "../http.js";
 import type * as lib_admin from "../lib/admin.js";
@@ -26,6 +27,7 @@ declare const fullApi: ApiFromModules<{
   admin: typeof admin;
   attendance: typeof attendance;
   auth: typeof auth;
+  e2e: typeof e2e;
   employees: typeof employees;
   http: typeof http;
   "lib/admin": typeof lib_admin;
