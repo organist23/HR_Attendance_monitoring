@@ -444,7 +444,12 @@ test.describe("US-10 Export CSV", () => {
         }),
       file,
     );
-    return done.then((d) => ({ ...d, text: fs.readFileSync(file, "utf8") }));
+    // Read, then delete: the file holds test data and must not outlive the pass.
+    return done.then((d) => {
+      const text = d.state === "completed" ? fs.readFileSync(file, "utf8") : "";
+      fs.rmSync(file, { force: true });
+      return { ...d, text };
+    });
   }
 
   test("Export CSV saves totals for the month", async () => {

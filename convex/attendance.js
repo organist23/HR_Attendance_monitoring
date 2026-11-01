@@ -120,7 +120,8 @@ const cell = (text) => {
   return /[",\r\n]/.test(safe) ? `"${safe.replaceAll('"', '""')}"` : safe;
 };
 
-// US-10. Every employee's monthly totals as CSV; inactive ones only if they have a record that month.
+// US-10. Every employee's monthly totals as CSV. Inactive ones only with a punch or a counted day
+// (absences before deactivation) that month.
 export const monthlyCsv = query({
   args: { month: v.string(), today: v.string() },
   handler: async (ctx, { month, today }) => {
@@ -135,7 +136,7 @@ export const monthlyCsv = query({
     const lines = [];
     for (const user of employees) {
       const { days, totals: t } = await monthFor(ctx, user, month, today);
-      if (!user.active && !days.some((d) => d.timeIn !== undefined)) continue;
+      if (!user.active && !t.required && !days.some((d) => d.timeIn !== undefined)) continue;
       lines.push(
         [cell(user.employeeId), cell(user.name), t.rendered, t.required, t.missing, t.late, t.undertime, t.absences].join(","),
       );

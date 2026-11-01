@@ -497,3 +497,10 @@ test("monthlyCsv: non-admin rejected", async () => {
   const { as } = await asRole(t, "employee", { employeeId: "E002", active: true });
   await expect(as.query(api.attendance.monthlyCsv, { month: "2026-11", today: "2026-11-06" })).rejects.toThrow("Not authorized");
 });
+
+test("monthlyCsv: deactivated mid-month with only absences is included", async () => {
+  const { employee, csv } = await csvSetup();
+  await employee("E002", { active: false, deactivatedOn: "2026-11-05" });
+  // Counted Nov 2-4 (created Nov 1, deactivated Nov 5): 3 absences, 1440 required.
+  expect((await csv()).csv).toContain("\r\nE002,Name E002,0,1440,1440,0,0,3\r\n");
+});
