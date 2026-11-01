@@ -51,7 +51,7 @@ Pass run under `.claude/skills/e2e-testing` (feature-workflow step 8).
 - One-off dev cleanup, approved by the developer: `e2e:purge` on `woozy-nightingale-996` removed 60 users, 60 accounts, 1 session and 2 refresh tokens from passes run before this skill existed. `E2E_PURGE_ALLOWED` was then removed from dev, which `env list` confirms.
 
 ## Left behind
-- The Convex project `hr-e2e-phase0` still exists until the developer deletes it in the dashboard.
+- Nothing. The developer deleted the Convex project `hr-e2e-phase0` in the dashboard (2026-11-01).
 
 ## Open
 - On a weekday (Manila), run a new pass under the e2e-testing skill to execute the 3 skipped workday tests.
