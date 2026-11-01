@@ -149,7 +149,7 @@ async function monthSetup({ createdAt = NOV1, active = true } = {}) {
   const holiday = (date, name = "Holiday") => t.run((ctx) => ctx.db.insert("holidays", { date, name }));
   const monthly = (args = {}) =>
     as.query(api.attendance.monthly, { employeeId: "E001", month: "2026-11", today: "2026-11-06", ...args });
-  return { t, punched, holiday, monthly };
+  return { t, as, userId, punched, holiday, monthly };
 }
 
 const byDate = (dtr) => Object.fromEntries(dtr.days.map((d) => [d.date, d]));
@@ -200,8 +200,28 @@ test("monthly: no absences before the employee was created", async () => {
   const { monthly } = await monthSetup({ createdAt: "2026-11-04T01:00:00Z" });
   const dtr = await monthly();
   const d = byDate(dtr);
-  expect([d["2026-11-02"].status, d["2026-11-03"].status, d["2026-11-04"].status]).toEqual(["", "", "Absent"]);
-  expect(dtr.totals.absences).toBe(2); // Nov 4 and Nov 5
+  // Creation day has no punch: not Absent, the employee may not have started yet.
+  expect([d["2026-11-03"].status, d["2026-11-04"].status, d["2026-11-05"].status]).toEqual(["", "", "Absent"]);
+  expect(dtr.totals.absences).toBe(1);
+});
+
+test("monthly: creation day with a punch counts", async () => {
+  const { punched, monthly } = await monthSetup({ createdAt: "2026-11-04T01:00:00Z" });
+  await punched("2026-11-04", "09:30", "17:00");
+  const d = byDate(await monthly());
+  expect(pick(d["2026-11-04"])).toEqual([390, 90, 0, 90, "Late"]);
+});
+
+test("monthly: deactivation keeps absences before it, none after", async () => {
+  const { as, userId, monthly } = await monthSetup();
+  at("2026-11-05T02:00:00Z"); // Thu Nov 5 10:00 Manila
+  await as.mutation(api.employees.setActive, { userId, active: false });
+  const dtr = await monthly({ today: "2026-11-10" });
+  const d = byDate(dtr);
+  expect(["02", "03", "04", "05", "06", "09"].map((n) => d[`2026-11-${n}`].status)).toEqual([
+    "Absent", "Absent", "Absent", "", "", "",
+  ]);
+  expect([dtr.totals.absences, dtr.totals.required]).toEqual([3, 1440]);
 });
 
 test("monthly: inactive employee has no absences", async () => {

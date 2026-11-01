@@ -93,8 +93,9 @@ export const monthly = query({
       const weekday = new Date(Date.UTC(y, m - 1, d)).getUTCDay();
       const row = rowOn.get(date);
       const holiday = holidayOn.get(date);
-      const counts =
-        isWorkday(weekday) && !holiday && date >= created && (row || (date < today && user.active));
+      // Absent only between creation and deactivation (exclusive), and never today or later.
+      const activeThen = user.active || (user.deactivatedOn !== undefined && date < user.deactivatedOn);
+      const counts = isWorkday(weekday) && !holiday && (row || (date > created && date < today && activeThen));
       const computed = counts ? computeDay({ timeIn: row?.timeIn, timeOut: row?.timeOut }) : NOT_COUNTED;
       if (counts) {
         totals.required += 480;
