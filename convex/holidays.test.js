@@ -33,7 +33,7 @@ test("duplicate date rejected, still one row", async () => {
 
 test("blank name, blank date, or malformed date rejected", async () => {
   const { add, list } = await setup();
-  for (const [date, name] of [["2026-11-04", "  "], ["", "X"], ["2026/11/04", "X"]]) {
+  for (const [date, name] of [["2026-11-04", "  "], ["", "X"], ["2026/11/04", "X"], ["2026-02-30", "X"], ["2026-13-01", "X"]]) {
     await expect(add(date, name)).rejects.toThrow("Holiday date and name are required");
   }
   expect(await list()).toHaveLength(0);

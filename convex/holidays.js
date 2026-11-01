@@ -17,7 +17,10 @@ export const add = mutation({
     await requireAdmin(ctx);
     const date = args.date.trim();
     const name = args.name.trim();
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !name) throw new ConvexError("Holiday date and name are required");
+    // Round-trip through Date rejects impossible dates like 2026-02-30.
+    const ms = Date.parse(`${date}T00:00:00Z`);
+    const real = /^\d{4}-\d{2}-\d{2}$/.test(date) && !Number.isNaN(ms) && new Date(ms).toISOString().startsWith(date);
+    if (!real || !name) throw new ConvexError("Holiday date and name are required");
     const existing = await ctx.db
       .query("holidays")
       .withIndex("by_date", (q) => q.eq("date", date))
