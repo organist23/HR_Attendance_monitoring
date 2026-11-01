@@ -1,9 +1,12 @@
-import { useQuery } from "convex/react";
-import { useState } from "react";
+import { useMutation, useQuery } from "convex/react";
+import { Fragment, useEffect, useRef, useState } from "react";
 import { api } from "../convex/_generated/api";
+import { manilaDay } from "../convex/lib/manila";
+import { errorText } from "./errors";
 import { manilaTime, useManilaDate } from "./Punch";
 
 const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+const FIELD = { timeIn: "Time in", timeOut: "Time out" };
 
 // Minutes → "7h 40m", "8h", "20m"; zero shows a dash.
 function duration(min) {
@@ -13,17 +16,103 @@ function duration(min) {
   return [h && `${h}h`, m && `${m}m`].filter(Boolean).join(" ");
 }
 
+const hhmm = (ms) => (ms === undefined ? "" : manilaTime(ms));
+
+// US-6: history plus the edit form for one day, shown under its row.
+function Correction({ employeeId, day, onClose }) {
+  const correct = useMutation(api.attendance.correct);
+  const [timeIn, setTimeIn] = useState(hhmm(day.timeIn));
+  const [timeOut, setTimeOut] = useState(hhmm(day.timeOut));
+  const [reason, setReason] = useState("");
+  const [pending, setPending] = useState(false);
+  const [error, setError] = useState("");
+  const first = useRef(null);
+
+  useEffect(() => first.current?.focus(), []);
+
+  async function submit(e) {
+    e.preventDefault();
+    if (pending) return;
+    setPending(true);
+    setError("");
+    try {
+      // Send only what the user changed: stored punches have seconds, the inputs only minutes.
+      await correct({
+        employeeId,
+        date: day.date,
+        reason,
+        ...(timeIn !== hhmm(day.timeIn) && { timeIn }),
+        ...(timeOut !== hhmm(day.timeOut) && { timeOut }),
+      });
+      onClose();
+    } catch (err) {
+      setError(errorText(err));
+      setPending(false);
+    }
+  }
+
+  return (
+    <tr>
+      <td colSpan={10}>
+        {day.corrections.length > 0 && (
+          <ul>
+            {day.corrections.map((c, i) => (
+              <li key={i}>
+                {FIELD[c.field]}: {c.from === undefined ? "—" : manilaTime(c.from)} → {manilaTime(c.to)} · {c.reason} ·{" "}
+                {manilaDay(c.at).date} {manilaTime(c.at)}
+              </li>
+            ))}
+          </ul>
+        )}
+        <form onSubmit={submit} onKeyDown={(e) => e.key === "Escape" && onClose()} className="row">
+          <label>
+            Time in
+            <input ref={first} type="time" value={timeIn} onChange={(e) => setTimeIn(e.target.value)} disabled={pending} />
+          </label>
+          <label>
+            Time out
+            <input type="time" value={timeOut} onChange={(e) => setTimeOut(e.target.value)} disabled={pending} />
+          </label>
+          <label>
+            Reason
+            <input value={reason} onChange={(e) => setReason(e.target.value)} disabled={pending} />
+          </label>
+          <button type="submit" disabled={pending}>
+            {pending ? "Saving…" : "Save"}
+          </button>
+          <button type="button" className="secondary" onClick={onClose} disabled={pending}>
+            Cancel
+          </button>
+        </form>
+        {error && (
+          <p role="alert" className="error">
+            {error}
+          </p>
+        )}
+      </td>
+    </tr>
+  );
+}
+
 export default function DTR() {
   const today = useManilaDate();
   const [employeeId, setEmployeeId] = useState("");
   const [month, setMonth] = useState(today.slice(0, 7));
   const [shown, setShown] = useState(null);
+  const [editing, setEditing] = useState(null);
+  const editButtons = useRef(new Map());
   const dtr = useQuery(api.attendance.monthly, shown ? { ...shown, today } : "skip");
 
   function submit(e) {
     e.preventDefault();
     if (!employeeId.trim() || !month) return;
+    setEditing(null);
     setShown({ employeeId: employeeId.trim(), month });
+  }
+
+  function close() {
+    editButtons.current.get(editing)?.focus();
+    setEditing(null);
   }
 
   return (
@@ -63,21 +152,42 @@ export default function DTR() {
                 <th>Undertime</th>
                 <th>Missing</th>
                 <th>Status</th>
+                <th>
+                  <span className="sr-only">Actions</span>
+                </th>
               </tr>
             </thead>
             <tbody>
               {dtr.days.map((d) => (
-                <tr key={d.date}>
-                  <td>{d.date}</td>
-                  <td>{DAYS[d.weekday]}</td>
-                  <td>{d.timeIn === undefined ? "—" : manilaTime(d.timeIn)}</td>
-                  <td>{d.timeOut === undefined ? "—" : manilaTime(d.timeOut)}</td>
-                  <td>{duration(d.rendered)}</td>
-                  <td>{duration(d.late)}</td>
-                  <td>{duration(d.undertime)}</td>
-                  <td>{duration(d.missing)}</td>
-                  <td>{d.holiday ?? d.status}</td>
-                </tr>
+                <Fragment key={d.date}>
+                  <tr>
+                    <td>{d.date}</td>
+                    <td>{DAYS[d.weekday]}</td>
+                    <td>{d.timeIn === undefined ? "—" : manilaTime(d.timeIn)}</td>
+                    <td>{d.timeOut === undefined ? "—" : manilaTime(d.timeOut)}</td>
+                    <td>{duration(d.rendered)}</td>
+                    <td>{duration(d.late)}</td>
+                    <td>{duration(d.undertime)}</td>
+                    <td>{duration(d.missing)}</td>
+                    <td>
+                      {d.holiday ?? d.status}
+                      {d.corrections.length > 0 && " · Corrected"}
+                    </td>
+                    <td>
+                      {(d.timeIn !== undefined || d.status === "Absent") && (
+                        <button
+                          ref={(el) => (el ? editButtons.current.set(d.date, el) : editButtons.current.delete(d.date))}
+                          className="secondary"
+                          aria-expanded={editing === d.date}
+                          onClick={() => setEditing(editing === d.date ? null : d.date)}
+                        >
+                          Edit
+                        </button>
+                      )}
+                    </td>
+                  </tr>
+                  {editing === d.date && <Correction employeeId={dtr.employeeId} day={d} onClose={close} />}
+                </Fragment>
               ))}
             </tbody>
             <tfoot>
@@ -89,7 +199,7 @@ export default function DTR() {
                 <td>{duration(dtr.totals.late)}</td>
                 <td>{duration(dtr.totals.undertime)}</td>
                 <td>{duration(dtr.totals.missing)}</td>
-                <td>
+                <td colSpan={2}>
                   Required {duration(dtr.totals.required)} · Absences {dtr.totals.absences}
                 </td>
               </tr>
