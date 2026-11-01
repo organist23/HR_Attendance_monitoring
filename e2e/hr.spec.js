@@ -454,6 +454,7 @@ test.describe("US-10 Export CSV", () => {
     seedPunch(a, "08:00", "17:00");
     const b = newId();
     await createEmployee(b);
+    await expect(rowFor(b)).toBeVisible(); // the create action must finish before seeding
     seedPunch(b, "08:00", "17:00");
     await rowFor(b).getByRole("button", { name: "Deactivate" }).click();
     await expect(rowFor(b)).toContainText("Inactive");
