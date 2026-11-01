@@ -53,3 +53,17 @@ test("isAdmin is true for admin, false for employee and anonymous", async () => 
   expect(await (await asRole(t, "employee")).as.query(api.admin.isAdmin, {})).toBe(false);
   expect(await (await asRole(t, "admin")).as.query(api.admin.isAdmin, {})).toBe(true);
 });
+
+test("sign-in ignores spaces around the username", async () => {
+  const { exportPKCS8, generateKeyPair } = await import("jose");
+  const { privateKey } = await generateKeyPair("RS256", { extractable: true });
+  process.env.JWT_PRIVATE_KEY = await exportPKCS8(privateKey);
+  process.env.CONVEX_SITE_URL = "https://test.convex.site";
+  const t = convexTest(schema, modules);
+  await t.action(internal.admin.create, { username: "boss", password: "admin-pass-1" });
+  const result = await t.action(api.auth.signIn, {
+    provider: "password",
+    params: { flow: "signIn", username: " boss ", password: "admin-pass-1" },
+  });
+  expect(result.tokens?.token).toBeTruthy();
+});

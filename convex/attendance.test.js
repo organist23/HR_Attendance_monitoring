@@ -108,3 +108,15 @@ test("non-admin rejected by punch and today", async () => {
   await expect(as.mutation(api.attendance.punch, { employeeId: "E002" })).rejects.toThrow("Not authorized");
   await expect(as.query(api.attendance.today, { date: "2026-11-02" })).rejects.toThrow("Not authorized");
 });
+
+test("today skips a row whose employee was deleted", async () => {
+  const { t, punch, today } = await setup();
+  at(MON_0805);
+  await punch();
+  await t.run(async (ctx) => {
+    const ghost = await ctx.db.insert("users", { role: "employee", employeeId: "E404", name: "Gone", active: true });
+    await ctx.db.insert("attendance", { userId: ghost, date: "2026-11-02", timeIn: 1 });
+    await ctx.db.delete(ghost);
+  });
+  expect((await today()).map((r) => r.employeeId)).toEqual(["E001"]);
+});

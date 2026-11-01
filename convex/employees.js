@@ -24,6 +24,8 @@ export const create = action({
     if (!employeeId || !name || !password.trim()) {
       throw new ConvexError("Employee ID, name, and password are required");
     }
+    // Same floor as the Password provider's default; createAccount does not enforce it.
+    if (password.length < 8) throw new ConvexError("Temporary password must be at least 8 characters");
     if (await ctx.runQuery(internal.employees.byEmployeeId, { employeeId })) {
       throw new ConvexError("Employee ID already exists");
     }

@@ -11,8 +11,8 @@ afterEach(() => {
 async function seed() {
   const t = convexTest(schema, modules);
   const { as } = await asRole(t, "admin");
-  const testId = await as.action(api.employees.create, { employeeId: "E2E-1", name: "Test", password: "p-1" });
-  const realId = await as.action(api.employees.create, { employeeId: "E001", name: "Real", password: "p-2" });
+  const testId = await as.action(api.employees.create, { employeeId: "E2E-1", name: "Test", password: "pass-0001" });
+  const realId = await as.action(api.employees.create, { employeeId: "E001", name: "Real", password: "pass-0002" });
   await t.run(async (ctx) => {
     for (const userId of [testId, realId]) {
       await ctx.db.insert("attendance", { userId, date: "2026-11-02", timeIn: 1 });

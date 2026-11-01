@@ -8,7 +8,7 @@ export const { auth, signIn, signOut, store, isAuthenticated } = convexAuth({
       // Accounts are created only server-side (admin:create, employees:create).
       profile(params) {
         if (params.flow !== "signIn") throw new ConvexError("Sign-up disabled");
-        return { email: String(params.username ?? "") };
+        return { email: String(params.username ?? "").trim() };
       },
     }),
   ],

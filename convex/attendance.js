@@ -45,10 +45,12 @@ export const today = query({
       .collect();
     const list = await Promise.all(
       rows.map(async ({ userId, timeIn, timeOut }) => {
-        const { employeeId, name } = await ctx.db.get(userId);
+        const user = await ctx.db.get(userId);
+        if (!user) return null; // employee deleted outside the app; skip rather than fail the list
+        const { employeeId, name } = user;
         return { employeeId, name, timeIn, timeOut, status: timeOut === undefined ? "Timed in" : "Timed out" };
       }),
     );
-    return list.sort((a, b) => a.timeIn - b.timeIn);
+    return list.filter(Boolean).sort((a, b) => a.timeIn - b.timeIn);
   },
 });

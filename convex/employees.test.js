@@ -75,7 +75,7 @@ test("setActive refuses the admin account", async () => {
 test("search Juan returns only matching", async () => {
   const { as } = await setup();
   await as.action(api.employees.create, juan);
-  await as.action(api.employees.create, { employeeId: "E002", name: "Maria Santos", password: "p" });
+  await as.action(api.employees.create, { employeeId: "E002", name: "Maria Santos", password: "pass-0002" });
   expect((await list(as, "Juan")).page.map((e) => e.employeeId)).toEqual(["E001"]);
   expect((await list(as, "E002")).page.map((e) => e.employeeId)).toEqual(["E002"]);
 });
@@ -115,5 +115,13 @@ test("employee ID equal to the admin username is rejected (same or different pas
       as.action(api.employees.create, { employeeId: "boss", name: "Fake", password }),
     ).rejects.toThrow("Employee ID already exists");
   }
+  expect(await employeeRows(t)).toHaveLength(0);
+});
+
+test("temporary password shorter than 8 characters rejected, nothing created", async () => {
+  const { t, as } = await setup();
+  await expect(as.action(api.employees.create, { ...juan, password: "1234567" })).rejects.toThrow(
+    "Temporary password must be at least 8 characters",
+  );
   expect(await employeeRows(t)).toHaveLength(0);
 });

@@ -1,12 +1,12 @@
 import { _electron as electron, expect, test } from "@playwright/test";
+import { isWorkday as isWorkdayRule, manilaDay } from "../convex/lib/manila.js";
 
 const USER = process.env.E2E_ADMIN_USER;
 const PASS = process.env.E2E_ADMIN_PASS;
 if (!USER || !PASS) throw new Error("Set E2E_ADMIN_USER and E2E_ADMIN_PASS in .env.e2e");
 
-// Server time decides workdays, so punch-flow tests can only run Monday-Friday (Manila).
-const manilaWeekday = new Date(Date.now() + 8 * 3600_000).getUTCDay();
-const isWorkday = manilaWeekday >= 1 && manilaWeekday <= 5;
+// Server time decides workdays, so punch-flow tests can only run on a Manila workday.
+const isWorkday = isWorkdayRule(manilaDay(Date.now()).weekday);
 
 let app;
 let page;
