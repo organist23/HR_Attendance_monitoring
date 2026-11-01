@@ -2,12 +2,13 @@ import { useAuthActions } from "@convex-dev/auth/react";
 import { useConvexAuth, useQuery } from "convex/react";
 import { api } from "../convex/_generated/api";
 import { useRef, useState } from "react";
+import DTR from "./DTR";
 import Employees from "./Employees";
 import Holidays from "./Holidays";
 import Login from "./Login";
 import Punch from "./Punch";
 
-const PANELS = { Punch, Employees, Holidays };
+const PANELS = { Punch, Employees, DTR, Holidays };
 const TABS = Object.keys(PANELS);
 
 export default function App() {
