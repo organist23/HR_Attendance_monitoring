@@ -68,47 +68,51 @@ export const monthly = query({
   args: { employeeId: v.string(), month: v.string(), today: v.string() },
   handler: async (ctx, { employeeId, month, today }) => {
     await requireAdmin(ctx);
-    if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(month)) throw new ConvexError("Invalid month");
     const user = await ctx.db
       .query("users")
       .withIndex("by_employeeId", (q) => q.eq("employeeId", employeeId.trim()))
       .first();
     if (user?.role !== "employee") return null;
-
-    const inMonth = (q) => q.gte("date", `${month}-01`).lte("date", `${month}-31`);
-    const rows = await ctx.db
-      .query("attendance")
-      .withIndex("by_user_date", (q) => inMonth(q.eq("userId", user._id)))
-      .collect();
-    const holidays = await ctx.db.query("holidays").withIndex("by_date", inMonth).collect();
-    const rowOn = new Map(rows.map((r) => [r.date, r]));
-    const holidayOn = new Map(holidays.map((h) => [h.date, h.name]));
-    const created = manilaDay(user._creationTime).date;
-
-    const [y, m] = month.split("-").map(Number);
-    const totals = { rendered: 0, required: 0, missing: 0, late: 0, undertime: 0, absences: 0 };
-    const days = [];
-    for (let d = 1; d <= new Date(Date.UTC(y, m, 0)).getUTCDate(); d++) {
-      const date = `${month}-${String(d).padStart(2, "0")}`;
-      const weekday = new Date(Date.UTC(y, m - 1, d)).getUTCDay();
-      const row = rowOn.get(date);
-      const holiday = holidayOn.get(date);
-      // Absent only between creation and deactivation (exclusive), and never today or later.
-      const activeThen = user.active || (user.deactivatedOn !== undefined && date < user.deactivatedOn);
-      const counts = isWorkday(weekday) && !holiday && (row || (date > created && date < today && activeThen));
-      const computed = counts ? computeDay({ timeIn: row?.timeIn, timeOut: row?.timeOut }) : NOT_COUNTED;
-      if (counts) {
-        totals.required += 480;
-        for (const k of ["rendered", "missing", "late", "undertime"]) totals[k] += computed[k];
-        if (computed.status === "Absent") totals.absences += 1;
-      }
-      days.push({
-        date, weekday, holiday, timeIn: row?.timeIn, timeOut: row?.timeOut, corrections: row?.corrections ?? [], ...computed,
-      });
-    }
-    return { employeeId: user.employeeId, name: user.name, days, totals };
+    return await monthFor(ctx, user, month, today);
   },
 });
+
+// The one DTR month builder: HR's `monthly` and the employee's `self.monthly` both use it.
+export async function monthFor(ctx, user, month, today) {
+  if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(month)) throw new ConvexError("Invalid month");
+  const inMonth = (q) => q.gte("date", `${month}-01`).lte("date", `${month}-31`);
+  const rows = await ctx.db
+    .query("attendance")
+    .withIndex("by_user_date", (q) => inMonth(q.eq("userId", user._id)))
+    .collect();
+  const holidays = await ctx.db.query("holidays").withIndex("by_date", inMonth).collect();
+  const rowOn = new Map(rows.map((r) => [r.date, r]));
+  const holidayOn = new Map(holidays.map((h) => [h.date, h.name]));
+  const created = manilaDay(user._creationTime).date;
+
+  const [y, m] = month.split("-").map(Number);
+  const totals = { rendered: 0, required: 0, missing: 0, late: 0, undertime: 0, absences: 0 };
+  const days = [];
+  for (let d = 1; d <= new Date(Date.UTC(y, m, 0)).getUTCDate(); d++) {
+    const date = `${month}-${String(d).padStart(2, "0")}`;
+    const weekday = new Date(Date.UTC(y, m - 1, d)).getUTCDay();
+    const row = rowOn.get(date);
+    const holiday = holidayOn.get(date);
+    // Absent only between creation and deactivation (exclusive), and never today or later.
+    const activeThen = user.active || (user.deactivatedOn !== undefined && date < user.deactivatedOn);
+    const counts = isWorkday(weekday) && !holiday && (row || (date > created && date < today && activeThen));
+    const computed = counts ? computeDay({ timeIn: row?.timeIn, timeOut: row?.timeOut }) : NOT_COUNTED;
+    if (counts) {
+      totals.required += 480;
+      for (const k of ["rendered", "missing", "late", "undertime"]) totals[k] += computed[k];
+      if (computed.status === "Absent") totals.absences += 1;
+    }
+    days.push({
+      date, weekday, holiday, timeIn: row?.timeIn, timeOut: row?.timeOut, corrections: row?.corrections ?? [], ...computed,
+    });
+  }
+  return { employeeId: user.employeeId, name: user.name, days, totals };
+}
 
 // US-6. Times are Manila "HH:MM" on `date`; only the fields given are changed.
 export const correct = mutation({
