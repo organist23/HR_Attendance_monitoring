@@ -59,4 +59,4 @@ All 4 passed again after the code was restored and redeployed.
 
 - **Purge:** 42 users, 42 accounts, 23 punches, 13 sessions, 18 refresh tokens, 3 rate limits, 1 holiday. Only `e2e-admin` remained.
 - **Dev restored:** `.env.local` points at `woozy-nightingale-996`, `.env.e2e` removed, both builds reference `woozy-nightingale-996` and not `keen-flamingo-154`.
-- **Left behind:** the Convex project `hr-e2e-weekday`, pending deletion by the developer in the dashboard.
+- **Left behind:** nothing. The developer deleted the Convex project `hr-e2e-weekday` in the dashboard on 2026-11-02.
