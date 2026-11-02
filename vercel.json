@@ -1,0 +1,5 @@
+{
+  "installCommand": "ELECTRON_SKIP_BINARY_DOWNLOAD=1 npm ci",
+  "buildCommand": "npx convex deploy --cmd \"npx vite build --config vite.web.config.js\"",
+  "outputDirectory": "dist/web"
+}

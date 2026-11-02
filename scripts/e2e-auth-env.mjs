@@ -1,5 +1,6 @@
 // Sets fresh Convex Auth env vars (JWT_PRIVATE_KEY, JWKS, SITE_URL) on one deployment.
-// Usage: node scripts/e2e-auth-env.mjs <deployment-name>   (see .claude/skills/e2e-testing)
+// Usage: node scripts/e2e-auth-env.mjs <deployment-name> [siteUrl]   (see .claude/skills/e2e-testing)
+// siteUrl defaults to the local dev server. Pass the Vercel URL for a hosted deployment.
 // Keys are generated here and never printed.
 import { exportJWK, exportPKCS8, generateKeyPair } from "jose";
 import { spawnSync } from "node:child_process";
@@ -14,7 +15,7 @@ const keys = await generateKeyPair("RS256", { extractable: true });
 const vars = {
   JWT_PRIVATE_KEY: (await exportPKCS8(keys.privateKey)).trimEnd().replace(/\n/g, " "),
   JWKS: JSON.stringify({ keys: [{ use: "sig", ...(await exportJWK(keys.publicKey)) }] }),
-  SITE_URL: "http://localhost:5173",
+  SITE_URL: process.argv[3] ?? "http://localhost:5173",
 };
 
 for (const [name, value] of Object.entries(vars)) {
