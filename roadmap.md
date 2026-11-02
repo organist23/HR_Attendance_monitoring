@@ -134,3 +134,39 @@ Picked up from Phase 1 and Phase 3: CSV totals come from `monthFor`, and the mon
 Decisions made with the user: CSV durations are whole minutes.
 
 Deliberately not built, and why: a separate print layout or signature block (the US-9 print view is the DTR table itself), changes to `electron/main.cjs` (Electron's default download handling shows the Save dialog).
+
+## Part two: Going live
+
+### Phase 5: Production backend and web app on Vercel NEXT
+
+Proves the release pipeline: a push to `main` deploys prod Convex and the web app together. Covers US-11, US-12.
+
+- A prod Convex deployment with its own auth keys and one HR admin
+- Vercel builds from `main`, runs `npx convex deploy` with the prod deploy key, and serves `dist/web`
+- The pipeline is proven first against a throwaway Convex project, and prod is then checked without creating data
+
+**Done when:** a push to `main` updates prod and `*.vercel.app`, the live site shows the employee login, the HR app built against prod logs in as the prod admin, and the purge and seed functions refuse on prod.
+
+Deliberately not built, and why: bulk import (Phase 6 owns it), the installer (Phase 7 owns it), a custom domain and staging (out of scope).
+
+### Phase 6: Bulk import of employees LATER
+
+Covers US-14.
+
+- Import CSV on the Employees tab, all-or-nothing validation with line-numbered errors
+- Random temp passwords, saved once by HR through the native Save dialog
+
+**Done when:** a 300+ row CSV imports in a throwaway E2E project, a bad row creates nothing, and an imported employee logs in with the saved temp password.
+
+Deliberately not built, and why: `.xlsx` input, importing punches, emailing passwords (out of scope). The installer comes after this phase so the first released installer already includes import.
+
+### Phase 7: Windows installer for the HR app LATER
+
+Covers US-13.
+
+- One command builds an unsigned Windows `.exe` against prod
+- The installer is published as a GitHub Release, and newer versions upgrade in place
+
+**Done when:** the installer from the GitHub Release installs on a Windows PC without Node, opens to the HR login, and logs in as the prod admin.
+
+Deliberately not built, and why: code signing, auto-update, macOS (out of scope).

@@ -156,3 +156,91 @@ All rules are implemented once, in Convex.
 
 ## Open Questions
 - None.
+
+---
+
+# Part two: Going live
+
+## Goal
+HR installs the desktop app on Windows from a GitHub Release, imports the existing employees from a CSV, and employees log in to the web app on Vercel, all against a production Convex deployment that a push to `main` releases.
+
+## Assumptions
+- Prod starts empty. Dev data on `woozy-nightingale-996` is not copied.
+- Prod gets its own auth keys and its own HR admin, created with the internal `admin:create` from the CLI. `E2E_PURGE_ALLOWED` is never set on prod.
+- Vercel is connected to the GitHub repo. Its build runs `npx convex deploy` with a prod deploy key, then builds the web app. A push to `main` releases backend and web together.
+- The web app uses the default `*.vercel.app` address. Prod's `SITE_URL` is that address.
+- The HR installer is Windows only and unsigned, so SmartScreen warns once on install. Updates mean installing a newer `.exe`. It is built locally against prod and uploaded to a GitHub Release.
+- An installed HR app keeps working against the newest prod backend until a change breaks compatibility. Such a change ships with a new installer.
+- The import CSV has a header row with columns for employee ID and full name. HR exports it from Excel, so it may start with a UTF-8 BOM.
+- Every row is validated before any employee is created.
+- E2E passes never run against prod (`e2e-testing` skill). Prod is checked only with steps that create no employees or punches.
+
+## User Stories
+
+### US-11: Production backend
+**As** the developer, **I want** a production Convex deployment separate from dev, **so that** real attendance data never mixes with test data.
+
+**Accepts when:**
+- [ ] A prod deployment exists with its own `JWT_PRIVATE_KEY`, `JWKS`, and `SITE_URL` set to the Vercel address.
+- [ ] Prod has exactly one HR admin, and the HR app built against prod logs in with it.
+- [ ] A push to `main` deploys the current functions and schema to prod.
+- [ ] Dev (`woozy-nightingale-996`) keeps working as before.
+
+**Rejects when:**
+- [ ] `e2e:purge` and `e2e:seedPunch` on prod fail with "E2E purge disabled on this deployment".
+- [ ] Running `admin:create` a second time on prod fails with "Admin already exists".
+- [ ] A Vercel build without the prod deploy key fails instead of deploying anywhere else.
+
+### US-12: Employee web app on Vercel
+**As** an employee, **I want** to open the attendance site from any browser, **so that** I can check my DTR without HR.
+
+**Accepts when:**
+- [ ] `https://<name>.vercel.app` shows the employee login.
+- [ ] An employee logs in, is forced to change the temp password, and sees their own DTR (US-7, US-8).
+- [ ] A push to `main` redeploys the site.
+
+**Rejects when:**
+- [ ] The deployed bundle references only the prod deployment, never dev or a test project.
+- [ ] A failed backend deploy fails the Vercel build, and the previous site stays live.
+- [ ] A wrong password on the live site shows the same error as US-7.
+
+### US-13: Windows installer for the HR app
+**As** HR, **I want** to install the desktop app like any Windows program, **so that** I don't need Node or the source code.
+
+**Accepts when:**
+- [ ] One command builds a Windows `.exe` installer against prod.
+- [ ] Installing on a Windows PC without Node adds a Start menu shortcut, and the app opens to the HR login and logs in with the prod admin.
+- [ ] The installer is attached to a GitHub Release tagged with the app version.
+- [ ] Installing a newer version upgrades in place, and uninstalling removes the app.
+
+**Rejects when:**
+- [ ] The build command refuses to run when the Convex URL is missing, dev, or a test project.
+- [ ] The installed app does not open DevTools or load anything except its own bundled files.
+
+### US-14: HR bulk-imports employees from CSV
+**As** HR, **I want** to import the existing employee list from a CSV, **so that** I don't type in 300+ employees one by one.
+
+**Accepts when:**
+- [ ] The Employees tab has an Import CSV button that opens a file picker.
+- [ ] A valid file creates every row as an active employee, each with a random temporary password.
+- [ ] HR then saves a CSV of employee ID, name, and temp password through the native Save dialog.
+- [ ] An imported employee logs in with that temp password and is forced to change it (US-7).
+- [ ] A 300+ row file imports, and names with accents like "Ñ" are preserved.
+- [ ] If HR cancels the Save dialog, the result stays on screen with a Save button until HR dismisses it.
+
+**Rejects when:**
+- [ ] Any bad row creates nothing, and every error is listed with its line number: a blank ID or name, an ID repeated in the file, or an ID that already exists.
+- [ ] A file with a missing ID or name column, no data rows, or that is not CSV creates nothing and says why.
+- [ ] Temp passwords are shown only in that result. They are not stored in plain text and cannot be fetched again later.
+
+## Out of Scope
+- Code signing and auto-update, because the user chose an unsigned manual installer.
+- macOS and Linux builds, because HR uses Windows.
+- A custom domain, because the default `*.vercel.app` was chosen.
+- Copying dev data to prod, because prod starts fresh.
+- Reading `.xlsx` directly, and importing punches or history, because the import takes a CSV of employees only.
+- Emailing or texting temp passwords, because HR hands them out from the saved file.
+- A staging deployment, because throwaway E2E projects cover pre-release testing.
+
+## Open Questions
+- None.
