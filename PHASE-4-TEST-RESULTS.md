@@ -37,3 +37,26 @@ Pass run under `.claude/skills/e2e-testing` (feature-workflow step 8).
 | One row per employee with ID, name, rendered, required, missing, late, undertime, and absences | `Export CSV saves totals for the month` (file `attendance-2026-10.csv`, BOM plus exact header, active A `480,480,0,0,0,0` with the name quoted, inactive B with a punch included, status `Exported N employees`) | PASS |
 | Inactive employees with no records in that month are not included | same test: inactive C with no punches is not in the file | PASS |
 | No month selected | `Export CSV is disabled with no month` | PASS |
+
+## Weekday pass (all phases)
+
+Full suite on a Manila weekday, so the 4 weekday-only punch tests ran for the first time. Same skill and isolation as above.
+
+- **Date:** 2026-11-02 (Monday, Asia/Manila, run at 08:43)
+- **Branch:** `main` at `4baded3`
+- **Test deployment:** throwaway project `hr-e2e-weekday`, deployment `keen-flamingo-154`. Admin was `e2e-admin` with a random password.
+- **Isolation checks:** all 4 passed before the run (build referenced `keen-flamingo-154` only, one user, `admin:isAdmin` false, `E2E_PURGE_ALLOWED` set).
+- **Full run:** 39 pass, 1 skipped, 0 fail, exit 0. The skip is `weekend punch shows Not a workday`, which runs only on Saturday/Sunday and passed on the 2026-11-01 runs.
+
+| Story | Test | Result | Watched fail |
+|---|---|---|---|
+| US-3 | `punch in then out shows Timed in then Timed out` | PASS | second punch throws instead of setting `timeOut` |
+| US-3 | `third punch shows Already timed out` | PASS | same mutation |
+| US-3 | `double Enter sends one punch` | PASS | removed all three guards in `hr/Punch.jsx` (`pending` check, input `disabled`, button `disabled`). With only the first two removed it stayed green, because a disabled submit button blocks implicit Enter submission. |
+| US-4 | `time-in only shows Incomplete for today` | PASS | `computeDay` returns `Present` instead of `Incomplete` |
+
+All 4 passed again after the code was restored and redeployed.
+
+- **Purge:** 42 users, 42 accounts, 23 punches, 13 sessions, 18 refresh tokens, 3 rate limits, 1 holiday. Only `e2e-admin` remained.
+- **Dev restored:** `.env.local` points at `woozy-nightingale-996`, `.env.e2e` removed, both builds reference `woozy-nightingale-996` and not `keen-flamingo-154`.
+- **Left behind:** the Convex project `hr-e2e-weekday`, pending deletion by the developer in the dashboard.

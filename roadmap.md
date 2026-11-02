@@ -122,7 +122,7 @@ Covers US-9, US-10.
 
 - Printable per-employee DTR and a monthly CSV of all employees
 
-**Verified** on 2026-11-01. Backend `npm test` 107/107. Playwright over Electron and in system Chrome ran in a throwaway Convex project under the `e2e-testing` skill: 36 pass and 4 skipped. The 4 skipped tests are the Phase 0/1 weekday-only punch tests and still need a weekday run. Results: `PHASE-4-TEST-RESULTS.md`.
+**Verified** on 2026-11-01. Backend `npm test` 107/107. Playwright over Electron and in system Chrome ran in a throwaway Convex project under the `e2e-testing` skill: 36 pass and 4 skipped. The 4 skipped tests are the Phase 0/1 weekday-only punch tests. A weekday pass on 2026-11-02 ran them: 39 pass, 1 skipped (the weekend-only test), each of the 4 watched fail. Results: `PHASE-4-TEST-RESULTS.md`.
 
 Shipped as:
 - `convex/attendance.js`: `monthlyCsv({ month, today })` returns `{ count, csv }`, one row per employee from `monthFor`, durations in minutes, with a formula-injection guard and CSV quoting.
