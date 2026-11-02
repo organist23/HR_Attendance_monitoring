@@ -7,7 +7,11 @@ import { asRole, modules } from "../test/convexHelpers";
 const MON_0805 = "2026-11-02T00:05:00Z"; // Monday 08:05 Manila
 const MON_1700 = "2026-11-02T09:00:00Z"; // Monday 17:00 Manila
 
-beforeEach(() => vi.useFakeTimers());
+// Fixtures are created before at(), so pin the clock before every test date. On the real clock they broke once today reached 2026-11-02.
+beforeEach(() => {
+  vi.useFakeTimers();
+  vi.setSystemTime(new Date("2026-10-01T00:00:00Z"));
+});
 afterEach(() => vi.useRealTimers());
 const at = (iso) => vi.setSystemTime(new Date(iso));
 
